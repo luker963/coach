@@ -13,9 +13,9 @@ agent_params = DQNAgentParameters()
 schedule_params = SimpleSchedule()
 schedule_params.heatup_steps = EnvironmentSteps(10)
 preset_validation_params = PresetValidationParameters()
-preset_validation_params.test = True
-preset_validation_params.min_reward_threshold = 20
-preset_validation_params.max_episodes_to_achieve_reward = 400
+# preset_validation_params.test = True
+# preset_validation_params.min_reward_threshold = 20
+# preset_validation_params.max_episodes_to_achieve_reward = 400
 
 vis_params = VisualizationParameters(render=False)
 

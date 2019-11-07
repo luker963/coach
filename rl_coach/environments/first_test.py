@@ -22,11 +22,13 @@ class FacEnv:
     map = None
     target = None
     player = None
+    wrongs = None
 
     def __init__(self):
+        self.wrongs = 0
         self.player = Player()
-        self.target = {'x': 2, 'y': 2}
-        # self.target = {'x': np.random.randint(-25, 25), 'y': np.random.randint(-25, 25)}
+        # self.target = {'x': 2, 'y': 2}
+        self.target = {'x': np.random.randint(-25, 25), 'y': np.random.randint(-25, 25)}
         print(self.target['x'], self.target['y'])
         self.observation = np.zeros((84, 84, 2), dtype=int)
         # setting target
@@ -37,6 +39,7 @@ class FacEnv:
 
 class TestCls(Environment):
     env = None
+    reward_limit = 0
 
     def __init__(self, level: LevelSelection, seed: int, frame_skip: int, human_control: bool,
                  custom_reward_threshold: Union[int, float], visualization_parameters: VisualizationParameters,
@@ -55,6 +58,7 @@ class TestCls(Environment):
         self.action_space = DiscreteActionSpace(num_actions=4,
                                                 descriptions={"0": "up", "1": "down", "2": "left", "3": "right"})
         self.env = FacEnv()
+        self.reward_limit = -np.power(np.sum(np.arange(1 + np.abs(self.env.target['x']) + np.abs(self.env.target['y'])))/2, 2)
 
     def _take_action(self, action_idx: ActionType) -> None:
         # print(self.env.player.y, self.env.player.x)
@@ -70,9 +74,16 @@ class TestCls(Environment):
         self.env.observation[self.env.player.x][self.env.player.y] = 1
 
     def _update_state(self) -> None:
-        self.reward = -np.linalg.norm(np.array((self.env.player.x, self.env.player.y))-np.array((self.env.target['x'], self.env.target['y'])))
+        new_reward = -(
+                    np.abs(self.env.player.x - self.env.target['x']) + np.abs(self.env.player.y - self.env.target['y']))
+
+        if self.reward > new_reward:
+            self.env.wrongs += 1
+        self.reward = new_reward
         self.goal = np.array([self.env.target['x'], self.env.target['y'], self.env.target['x'], self.env.target['y']])
-        self.done = ((self.env.player.x == self.env.target['x']) and (self.env.player.y == self.env.target['y'])) or (np.abs(self.env.player.x) > 80 or np.abs(self.env.player.y) > 80)
+        # self.done = ((self.env.player.x == self.env.target['x']) and (self.env.player.y == self.env.target['y'])) or (np.abs(self.env.player.x) > 80 or np.abs(self.env.player.y) > 80)
+        self.done = (np.abs(self.env.player.x) > 80 or np.abs(
+            self.env.player.y) > 80) or self.total_reward_in_current_episode < self.reward_limit or ((self.env.player.x == self.env.target['x']) and (self.env.player.y == self.env.target['y']))
 
         self.state = {
             "observation": np.array([self.env.player.x, self.env.player.y, self.env.target['x'], self.env.target['y']])
@@ -83,7 +94,16 @@ class TestCls(Environment):
         }
 
     def _restart_environment_episode(self, force_environment_reset=False) -> None:
+        if (self.env.player.x == self.env.target['x']) and (self.env.player.y == self.env.target['y']):
+            print("TARGET")
+        if np.abs(self.env.player.x) > 80 or np.abs(self.env.player.y) > 80:
+            print("LOST")
         self.env.player = Player()
+        self.env.target = {'x': np.random.randint(-25, 25), 'y': np.random.randint(-25, 25)}
+        print("Wrongs: ", self.env.wrongs)
+        print(self.env.target['x'], self.env.target['y'])
+        self.env.wrongs = 0
+        self.reward_limit = -np.power(np.sum(np.arange(1 + np.abs(self.env.target['x']) + np.abs(self.env.target['y'])))/2, 2)
 
     def get_rendered_image(self):
         return self.env.map
