@@ -1,3 +1,5 @@
+from rl_coach.agents.actor_critic_agent import ActorCriticAgentParameters
+
 from rl_coach.memories.memory import MemoryGranularity
 
 from rl_coach.memories.non_episodic import ExperienceReplayParameters
@@ -13,12 +15,8 @@ from rl_coach.environments.second_test import ControlSuiteEnvironmentParameters
 from rl_coach.graph_managers.basic_rl_graph_manager import BasicRLGraphManager
 from rl_coach.graph_managers.graph_manager import SimpleSchedule
 
-experience_replay_parameters = ExperienceReplayParameters()
-experience_replay_parameters.max_size = (MemoryGranularity.Transitions, 50000)
-agent_params = DQNAgentParameters()
-agent_params.memory = experience_replay_parameters
+agent_params = ActorCriticAgentParameters()
 schedule_params = SimpleSchedule()
-schedule_params.heatup_steps = EnvironmentSteps(10)
 preset_validation_params = PresetValidationParameters(test=True, min_reward_threshold=-50000, max_episodes_to_achieve_reward=10, num_workers=5)
 vis_params = VisualizationParameters(render=False)
 

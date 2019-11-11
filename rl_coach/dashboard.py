@@ -64,7 +64,7 @@ def main():
     from rl_coach.utils import get_open_port
 
     dashboard_path = os.path.realpath(__file__)
-    port = get_open_port()
+    port = 42739
     command = 'bokeh serve --show {path} --port {port}'.format(path=dashboard_path, port=port)
 
     if args.allow_remote_connection:

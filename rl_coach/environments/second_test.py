@@ -1,23 +1,27 @@
 import logging
 import sys
+from enum import IntEnum
+from typing import Union
+import numpy as np
+import gc
 
 from rl_coach.base_parameters import VisualizationParameters
-
-from rl_coach.filters.filter import NoInputFilter, NoOutputFilter
-from enum import Enum, IntEnum
-from typing import Union
-from rl_coach.spaces import StateSpace, DiscreteActionSpace, PlanarMapsObservationSpace
-import numpy as np
 from rl_coach.core_types import ActionType
 from rl_coach.environments.environment import Environment, LevelSelection, EnvironmentParameters
+from rl_coach.filters.filter import NoInputFilter, NoOutputFilter
+from rl_coach.spaces import StateSpace, DiscreteActionSpace, PlanarMapsObservationSpace
 
 
 class Channels(IntEnum):
     ENTITY = 0
-    ORIENTATION = 1
-    ORE = 2
-    CONTENT = 3
-    PLAYER = 4
+    # ORIENTATION = 1
+    ORE = 1
+    CONTENT = 2
+    PLAYER = 3
+    UP = 4
+    DOWN = 5
+    LEFT = 6
+    RIGHT = 7
 
 
 class Entities(IntEnum):
@@ -29,10 +33,10 @@ class Entities(IntEnum):
 
 
 class Orientations(IntEnum):
-    UP = 0
-    DOWN = 1
-    LEFT = 2
-    RIGHT = 3
+    UP = 4
+    DOWN = 5
+    LEFT = 6
+    RIGHT = 7
 
     @classmethod
     def opposite_of(cls, orientation):
@@ -70,6 +74,7 @@ class FactEnv(Environment):
     formatter = logging.Formatter('%(message)s')
     ch.setFormatter(formatter)
     logger.addHandler(ch)
+    minimum_reward = None
 
     def map_oriented_increment(self, x, y, channel, orientation):
         if orientation == Orientations.UP:
@@ -82,10 +87,10 @@ class FactEnv(Environment):
             return self.map[x + 1][y][channel]
 
     def spawn_ore(self):
-        ore_coord_x = np.random.randint(10, 90)
-        ore_coord_y = np.random.randint(10, 90)
-        for x in range(ore_coord_x - 3, ore_coord_x + 3):
-            dist = 3 - np.abs(x - ore_coord_x)
+        ore_coord_x = np.random.randint(20, 80)
+        ore_coord_y = np.random.randint(20, 80)
+        for x in range(ore_coord_x - 10, ore_coord_x + 10):
+            dist = 10 - np.abs(x - ore_coord_x)
             for y in range(ore_coord_y - dist, ore_coord_y + dist):
                 self.map[x][y][Channels.ORE] = 1
 
@@ -97,56 +102,64 @@ class FactEnv(Environment):
         self.logger.debug("[MAP UPDATE]: Chests count: {}".format(len(self.chests)))
 
         for miner in self.miners:
-            if self.map[miner[0]][miner[1]][Channels.ORIENTATION] == Orientations.UP and \
-                    self.map[miner[0]][miner[1] + 1][Channels.CONTENT] == 0:
+            if self.map[miner[0]][miner[1]][Channels.UP] and not \
+                    self.map_oriented_increment(miner[0], miner[1], Channels.CONTENT, Orientations.UP):  # self.map[miner[0]][miner[1] + 1][Channels.CONTENT] == 0:
                 self.map[miner[0]][miner[1] + 1][Channels.CONTENT] += 1
-                self.logger.debug("[MAP UPDATE]: Miner at {},{} produced ore UP".format(miner[0], miner[1]))
-            if self.map[miner[0]][miner[1]][Channels.ORIENTATION] == Orientations.DOWN and \
-                    self.map[miner[0]][miner[1] - 1][Channels.CONTENT] == 0:
+                self.logger.info("[MAP UPDATE]: Miner at {},{} produced ore UP".format(miner[0], miner[1]))
+            if self.map[miner[0]][miner[1]][Channels.DOWN] and not \
+                    self.map_oriented_increment(miner[0], miner[1], Channels.CONTENT, Orientations.DOWN):
                 self.map[miner[0]][miner[1] - 1][Channels.CONTENT] += 1
-                self.logger.debug("[MAP UPDATE]: Miner at {},{} produced ore DOWN".format(miner[0], miner[1]))
-            if self.map[miner[0]][miner[1]][Channels.ORIENTATION] == Orientations.LEFT and \
-                    self.map[miner[0] - 1][miner[1]][Channels.CONTENT] == 0:
+                self.logger.info("[MAP UPDATE]: Miner at {},{} produced ore DOWN".format(miner[0], miner[1]))
+            if self.map[miner[0]][miner[1]][Channels.LEFT] and not \
+                    self.map_oriented_increment(miner[0], miner[1], Channels.CONTENT, Orientations.LEFT):
                 self.map[miner[0] - 1][miner[1]][Channels.CONTENT] += 1
-                self.logger.debug("[MAP UPDATE]: Miner at {},{} produced ore LEFT".format(miner[0], miner[1]))
-            if self.map[miner[0]][miner[1]][Channels.ORIENTATION] == Orientations.RIGHT and \
-                    self.map[miner[0] + 1][miner[1]][Channels.CONTENT] == 0:
+                self.logger.info("[MAP UPDATE]: Miner at {},{} produced ore LEFT".format(miner[0], miner[1]))
+            if self.map[miner[0]][miner[1]][Channels.RIGHT] and not \
+                    self.map_oriented_increment(miner[0], miner[1], Channels.CONTENT, Orientations.RIGHT):
                 self.map[miner[0] + 1][miner[1]][Channels.CONTENT] += 1
-                self.logger.debug("[MAP UPDATE]: Miner at {},{} produced ore RIGHT".format(miner[0], miner[1]))
+                self.logger.info("[MAP UPDATE]: Miner at {},{} produced ore RIGHT".format(miner[0], miner[1]))
         for inserter in self.inserters:
-            if self.map[inserter[0]][inserter[1]][Channels.ORIENTATION] == Orientations.UP:
-                if self.map[inserter[0]][inserter[1] - 1][Channels.CONTENT] > 0:
+            if self.map[inserter[0]][inserter[1]][Channels.UP]:
+                if self.map_oriented_increment(inserter[0], inserter[1], Channels.CONTENT, Orientations.DOWN) and not self.map_oriented_increment(inserter[0], inserter[1], Channels.CONTENT, Orientations.UP):
                     self.map[inserter[0]][inserter[1] - 1][Channels.CONTENT] -= 1
                     self.map[inserter[0]][inserter[1] + 1][Channels.CONTENT] += 1
-            if self.map[inserter[0]][inserter[1]][Channels.ORIENTATION] == Orientations.DOWN:
-                if self.map[inserter[0]][inserter[1] + 1][Channels.CONTENT] > 0:
+                    self.logger.info("[MAP UPDATE]: Inserter at {},{} moved ore UP".format(inserter[0], inserter[1]))
+            if self.map[inserter[0]][inserter[1]][Channels.DOWN]:
+                if self.map_oriented_increment(inserter[0], inserter[1], Channels.CONTENT, Orientations.UP) and not self.map_oriented_increment(inserter[0], inserter[1], Channels.CONTENT, Orientations.DOWN):
                     self.map[inserter[0]][inserter[1] + 1][Channels.CONTENT] -= 1
                     self.map[inserter[0]][inserter[1] - 1][Channels.CONTENT] += 1
-            if self.map[inserter[0]][inserter[1]][Channels.ORIENTATION] == Orientations.LEFT:
-                if self.map[inserter[0] + 1][inserter[1]][Channels.CONTENT] > 0:
+                    self.logger.info("[MAP UPDATE]: Inserter at {},{} moved ore DOWN".format(inserter[0], inserter[1]))
+            if self.map[inserter[0]][inserter[1]][Channels.LEFT]:
+                if self.map_oriented_increment(inserter[0], inserter[1], Channels.CONTENT, Orientations.RIGHT) and not self.map_oriented_increment(inserter[0], inserter[1], Channels.CONTENT, Orientations.LEFT):
                     self.map[inserter[0] + 1][inserter[1]][Channels.CONTENT] -= 1
                     self.map[inserter[0] - 1][inserter[1]][Channels.CONTENT] += 1
-            if self.map[inserter[0]][inserter[1]][Channels.ORIENTATION] == Orientations.RIGHT:
-                if self.map[inserter[0] - 1][inserter[1]][Channels.CONTENT] > 0:
+                    self.logger.info("[MAP UPDATE]: Inserter at {},{} moved ore LEFT".format(inserter[0], inserter[1]))
+            if self.map[inserter[0]][inserter[1]][Channels.RIGHT]:
+                if self.map_oriented_increment(inserter[0], inserter[1], Channels.CONTENT, Orientations.LEFT) and not self.map_oriented_increment(inserter[0], inserter[1], Channels.CONTENT, Orientations.RIGHT):
                     self.map[inserter[0] - 1][inserter[1]][Channels.CONTENT] -= 1
                     self.map[inserter[0] + 1][inserter[1]][Channels.CONTENT] += 1
+                    self.logger.info("[MAP UPDATE]: Inserter at {},{} moved ore RIGHT".format(inserter[0], inserter[1]))
         for belt in self.belts:
-            if self.map[belt[0]][belt[1]][Channels.ORIENTATION] == Orientations.UP:
-                if self.map[belt[0]][belt[1]][Channels.CONTENT] > 0:
+            if self.map[belt[0]][belt[1]][Channels.UP]:
+                if self.map[belt[0]][belt[1]][Channels.CONTENT] > 0 and not self.map_oriented_increment(belt[0], belt[1], Channels.CONTENT, Orientations.UP):
                     self.map[belt[0]][belt[1]][Channels.CONTENT] -= 1
                     self.map[belt[0]][belt[1] + 1][Channels.CONTENT] += 1
-            if self.map[belt[0]][belt[1]][Channels.ORIENTATION] == Orientations.DOWN:
-                if self.map[belt[0]][belt[1]][Channels.CONTENT] > 0:
+                    self.logger.info("[MAP UPDATE]: Belt at {},{} moved ore UP".format(belt[0], belt[1]))
+            if self.map[belt[0]][belt[1]][Channels.DOWN]:
+                if self.map[belt[0]][belt[1]][Channels.CONTENT] > 0 and not self.map_oriented_increment(belt[0], belt[1], Channels.CONTENT, Orientations.DOWN):
                     self.map[belt[0]][belt[1]][Channels.CONTENT] -= 1
                     self.map[belt[0]][belt[1] - 1][Channels.CONTENT] += 1
-            if self.map[belt[0]][belt[1]][Channels.ORIENTATION] == Orientations.LEFT:
-                if self.map[belt[0]][belt[1]][Channels.CONTENT] > 0:
+                    self.logger.info("[MAP UPDATE]: Belt at {},{} moved ore DOWN".format(belt[0], belt[1]))
+            if self.map[belt[0]][belt[1]][Channels.LEFT]:
+                if self.map[belt[0]][belt[1]][Channels.CONTENT] > 0 and not self.map_oriented_increment(belt[0], belt[1], Channels.CONTENT, Orientations.LEFT):
                     self.map[belt[0]][belt[1]][Channels.CONTENT] -= 1
                     self.map[belt[0] - 1][belt[1]][Channels.CONTENT] += 1
-            if self.map[belt[0]][belt[1]][Channels.ORIENTATION] == Orientations.RIGHT:
-                if self.map[belt[0]][belt[1]][Channels.CONTENT] > 0:
-                    self.map[belt[0]][belt[1] + 1][Channels.CONTENT] -= 1
+                    self.logger.info("[MAP UPDATE]: Belt at {},{} moved ore LEFT".format(belt[0], belt[1]))
+            if self.map[belt[0]][belt[1]][Channels.RIGHT]:
+                if self.map[belt[0]][belt[1]][Channels.CONTENT] > 0 and not self.map_oriented_increment(belt[0], belt[1], Channels.CONTENT, Orientations.RIGHT):
+                    self.map[belt[0]][belt[1]][Channels.CONTENT] -= 1
                     self.map[belt[0] + 1][belt[1]][Channels.CONTENT] += 1
+                    self.logger.info("[MAP UPDATE]: Belt at {},{} moved ore RIGHT".format(belt[0], belt[1]))
 
     # Map definition:
     #   [x][y][0] == 1 is player location
@@ -168,6 +181,7 @@ class FactEnv(Environment):
         self.belts = []
         self.chests = []
         self.new_reward = 0
+        self.minimum_reward = -100000
 
     def _move_player(self, action_idx):
         old_player = Player(self.player.x, self.player.y)
@@ -203,100 +217,139 @@ class FactEnv(Environment):
     def _place_oriented(self, action_idx):
         if 1 > self.player.x or self.player.x > 98 or 1 > self.player.y or self.player.y > 98:  # out of map bound
             self.new_reward = -500
-        elif self.map[self.player.x][self.player.y][Channels.ENTITY] > 1:  # placing on top of something
+        elif self.map[self.player.x][self.player.y][Channels.ENTITY] > 0:  # placing on top of something
             self.new_reward = -500
             # print("PLACEMENT: unable to place, there is already {}".format(self.map[self.player.x][self.player.y][0]))
         elif action_idx < 12:  # MINER
             if self.map[self.player.x][self.player.y][Channels.ORE] == 1:  # if ore is present
                 self.map[self.player.x][self.player.y][Channels.ENTITY] = Entities.MINER
                 if action_idx == 8:
-                    self.map[self.player.x][self.player.y][Channels.ORIENTATION] = Orientations.UP
-                    if self.map[self.player.x][self.player.y + 1][Channels.ENTITY] == Entities.BELT and \
-                            self.map[self.player.x][self.player.y + 1][Channels.ORIENTATION] != Orientations.DOWN:
-                        self.new_reward += 100
+                    self.map[self.player.x][self.player.y][Channels.UP] = 1
+                    if self.map[self.player.x][self.player.y + 1][Channels.ENTITY] == Entities.BELT and not \
+                            self.map[self.player.x][self.player.y + 1][Channels.DOWN]:
+                        self.new_reward += 2000
+                        self.logger.info("[PLACEMENT]: Miner placed next to the belt")
                 elif action_idx == 9:
-                    self.map[self.player.x][self.player.y][Channels.ORIENTATION] = Orientations.DOWN
-                    if self.map[self.player.x][self.player.y - 1][Channels.ENTITY] == Entities.BELT and \
-                            self.map[self.player.x][self.player.y - 1][Channels.ORIENTATION] != Orientations.UP:
-                        self.new_reward += 100
+                    self.map[self.player.x][self.player.y][Channels.DOWN] = 1
+                    if self.map[self.player.x][self.player.y - 1][Channels.ENTITY] == Entities.BELT and not \
+                            self.map[self.player.x][self.player.y - 1][Channels.UP]:
+                        self.new_reward += 2000
+                        self.logger.info("[PLACEMENT]: Miner placed next to the belt")
                 elif action_idx == 10:
-                    self.map[self.player.x][self.player.y][Channels.ORIENTATION] = Orientations.LEFT
-                    if self.map[self.player.x - 1][self.player.y][Channels.ENTITY] == Entities.BELT and \
-                            self.map[self.player.x - 1][self.player.y][Channels.ORIENTATION] != Orientations.RIGHT:
-                        self.new_reward += 100
+                    self.map[self.player.x][self.player.y][Channels.LEFT] = 1
+                    if self.map[self.player.x - 1][self.player.y][Channels.ENTITY] == Entities.BELT and not \
+                            self.map[self.player.x - 1][self.player.y][Channels.RIGHT]:
+                        self.new_reward += 2000
+                        self.logger.info("[PLACEMENT]: Miner placed next to the belt")
                 elif action_idx == 11:
-                    self.map[self.player.x][self.player.y][Channels.ORIENTATION] = Orientations.RIGHT
-                    if self.map[self.player.x + 1][self.player.y][Channels.ENTITY] == Entities.BELT and \
-                            self.map[self.player.x + 1][self.player.y][Channels.ORIENTATION] != Orientations.LEFT:
-                        self.new_reward += 100
+                    self.map[self.player.x][self.player.y][Channels.RIGHT] = 1
+                    if self.map[self.player.x + 1][self.player.y][Channels.ENTITY] == Entities.BELT and not \
+                            self.map[self.player.x + 1][self.player.y][Channels.LEFT]:
+                        self.new_reward += 2000
+                        self.logger.info("[PLACEMENT]: Miner placed next to the belt")
                 self.miners.append((self.player.x, self.player.y))
                 self.new_reward += 100
+                self.new_reward -= 50*len(self.miners)
                 self.logger.info("[PLACEMENT]: Miner placed at x:{} y:{}".format(self.player.x, self.player.y))
+                # self.minimum_reward = -500000
             else:
                 self.new_reward = -100
                 self.logger.debug("[PLACEMENT]: unable to place miner without ore")
         elif action_idx < 16:  # BELT
             self.map[self.player.x][self.player.y][Channels.ENTITY] = Entities.BELT
             if action_idx == 12:
-                self.map[self.player.x][self.player.y][Channels.ORIENTATION] = Orientations.UP
-                if self.map[self.player.x][self.player.y + 1][Channels.ENTITY] == Entities.BELT and \
-                        self.map[self.player.x][self.player.y + 1][Channels.ORIENTATION] != Orientations.DOWN:
+                self.map[self.player.x][self.player.y][Channels.UP] = 1
+                if self.map[self.player.x][self.player.y + 1][Channels.ENTITY] == Entities.BELT and not \
+                        self.map[self.player.x][self.player.y + 1][Channels.DOWN]:
                     self.new_reward += 100
             elif action_idx == 13:
-                self.map[self.player.x][self.player.y][Channels.ORIENTATION] = Orientations.DOWN
-                if self.map[self.player.x][self.player.y - 1][Channels.ENTITY] == Entities.BELT and \
-                        self.map[self.player.x][self.player.y - 1][Channels.ORIENTATION] != Orientations.UP:
+                self.map[self.player.x][self.player.y][Channels.DOWN] = 1
+                if self.map[self.player.x][self.player.y - 1][Channels.ENTITY] == Entities.BELT and not \
+                        self.map[self.player.x][self.player.y - 1][Channels.UP]:
                     self.new_reward += 100
             elif action_idx == 14:
-                self.map[self.player.x][self.player.y][Channels.ORIENTATION] = Orientations.LEFT
-                if self.map[self.player.x - 1][self.player.y][Channels.ENTITY] == Entities.BELT and \
-                        self.map[self.player.x - 1][self.player.y][Channels.ORIENTATION] != Orientations.RIGHT:
+                self.map[self.player.x][self.player.y][Channels.LEFT] = 1
+                if self.map[self.player.x - 1][self.player.y][Channels.ENTITY] == Entities.BELT and not \
+                        self.map[self.player.x - 1][self.player.y][Channels.RIGHT]:
                     self.new_reward += 100
             elif action_idx == 15:
-                self.map[self.player.x][self.player.y][Channels.ORIENTATION] = Orientations.RIGHT
-                if self.map[self.player.x + 1][self.player.y][Channels.ENTITY] == Entities.BELT and \
-                        self.map[self.player.x + 1][self.player.y][Channels.ORIENTATION] != Orientations.LEFT:
+                self.map[self.player.x][self.player.y][Channels.RIGHT] = 1
+                if self.map[self.player.x + 1][self.player.y][Channels.ENTITY] == Entities.BELT and not \
+                        self.map[self.player.x + 1][self.player.y][Channels.LEFT]:
                     self.new_reward += 100
             self.belts.append((self.player.x, self.player.y))
             for orientation in Orientations:
+                # ak je v okoli belt
                 if self.map_oriented_increment(self.player.x, self.player.y, Channels.ENTITY,
-                                               orientation) == Entities.BELT and self.map_oriented_increment(self.player.x, self.player.y, Channels.ORIENTATION, orientation) != Orientations.opposite_of(orientation):
-                    self.new_reward += 100
+                                               orientation) == Entities.BELT:
+                    # ak ten belt smeruje na poziciu originu
+                    if self.map_oriented_increment(self.player.x, self.player.y, Orientations.opposite_of(orientation),
+                                                   orientation):
+                        # ak nema belt v origine orientaciu kolidujucu s beltom v okoli
+                        if not self.map[self.player.x][self.player.y][orientation]:
+                            self.new_reward += 100
+                            self.logger.info("[PLACEMENT]: Belt placed next to the belt")
+                        else:  # ak ma belt v origine orientaciu kolidujucu s beltom v okoli
+                            self.new_reward += -500
+                            self.logger.info("[PLACEMENT]: Belt placed next to the belt but WRONG")
+                # ak je v okoli miner
+                elif self.map_oriented_increment(self.player.x, self.player.y, Channels.ENTITY,
+                                               orientation) == Entities.MINER:
+                    # ak ten miner smeruje na poziciu originu
+                    if self.map_oriented_increment(self.player.x, self.player.y, Orientations.opposite_of(orientation),
+                                                   orientation):
+                        # ak nema belt v origine orientaciu kolidujucu s minerom v okoli
+                        if not self.map[self.player.x][self.player.y][orientation]:
+                            self.new_reward += 2000
+                            self.logger.info("[PLACEMENT]: Belt placed next to the miner")
+                        else:  # ak ma belt v origine orientaciu kolidujucu s beltom v okoli
+                            self.new_reward += -500
+                            self.logger.info("[PLACEMENT]: Belt placed next to the miner but WRONG")
+            self.new_reward -= 50 * len(self.belts)
             # print("PLACEMENT: Belt placed at x:{} y:{}".format(self.player.x, self.player.y))
         elif action_idx < 20:  # INSERTER
             self.map[self.player.x][self.player.y][Channels.ENTITY] = Entities.INSERTER
             if action_idx == 16:
-                self.map[self.player.x][self.player.y][Channels.ORIENTATION] = Orientations.UP
-                if self.map_oriented_increment(self.player.x, self.player.y, Channels.ENTITY, Orientations.DOWN) != Entities.EMPTY:
+                self.map[self.player.x][self.player.y][Channels.UP] = 1
+                if self.map_oriented_increment(self.player.x, self.player.y, Channels.ENTITY,
+                                               Orientations.DOWN) != Entities.EMPTY:
                     self.new_reward += 100
-                if self.map_oriented_increment(self.player.x, self.player.y, Channels.ENTITY, Orientations.UP) == Entities.CHEST:
+                if self.map_oriented_increment(self.player.x, self.player.y, Channels.ENTITY,
+                                               Orientations.UP) == Entities.CHEST:
                     self.new_reward += 100
             elif action_idx == 17:
-                self.map[self.player.x][self.player.y][Channels.ORIENTATION] = Orientations.DOWN
-                if self.map_oriented_increment(self.player.x, self.player.y, Channels.ENTITY, Orientations.UP) != Entities.EMPTY:
+                self.map[self.player.x][self.player.y][Channels.DOWN] = 1
+                if self.map_oriented_increment(self.player.x, self.player.y, Channels.ENTITY,
+                                               Orientations.UP) != Entities.EMPTY:
                     self.new_reward += 100
-                if self.map_oriented_increment(self.player.x, self.player.y, Channels.ENTITY, Orientations.DOWN) == Entities.CHEST:
+                if self.map_oriented_increment(self.player.x, self.player.y, Channels.ENTITY,
+                                               Orientations.DOWN) == Entities.CHEST:
                     self.new_reward += 100
             elif action_idx == 18:
-                self.map[self.player.x][self.player.y][Channels.ORIENTATION] = Orientations.LEFT
-                if self.map_oriented_increment(self.player.x, self.player.y, Channels.ENTITY, Orientations.RIGHT) != Entities.EMPTY:
+                self.map[self.player.x][self.player.y][Channels.LEFT] = 1
+                if self.map_oriented_increment(self.player.x, self.player.y, Channels.ENTITY,
+                                               Orientations.RIGHT) != Entities.EMPTY:
                     self.new_reward += 100
-                if self.map_oriented_increment(self.player.x, self.player.y, Channels.ENTITY, Orientations.LEFT) == Entities.CHEST:
+                if self.map_oriented_increment(self.player.x, self.player.y, Channels.ENTITY,
+                                               Orientations.LEFT) == Entities.CHEST:
                     self.new_reward += 100
             elif action_idx == 19:
-                self.map[self.player.x][self.player.y][Channels.ORIENTATION] = Orientations.RIGHT
-                if self.map_oriented_increment(self.player.x, self.player.y, Channels.ENTITY, Orientations.LEFT) != Entities.EMPTY:
+                self.map[self.player.x][self.player.y][Channels.RIGHT] = 1
+                if self.map_oriented_increment(self.player.x, self.player.y, Channels.ENTITY,
+                                               Orientations.LEFT) != Entities.EMPTY:
                     self.new_reward += 100
-                if self.map_oriented_increment(self.player.x, self.player.y, Channels.ENTITY, Orientations.RIGHT) == Entities.CHEST:
+                if self.map_oriented_increment(self.player.x, self.player.y, Channels.ENTITY,
+                                               Orientations.RIGHT) == Entities.CHEST:
                     self.new_reward += 100
             self.inserters.append((self.player.x, self.player.y))
+            self.new_reward -= 50 * len(self.inserters)
             # print("PLACEMENT: Inserter placed at x:{} y:{}".format(self.player.x, self.player.y))
 
     def _place_invariant(self, action_idx):
         if action_idx == 20:  # CHEST
-            self.map[self.player.x][self.player.y][0] = 5
+            self.map[self.player.x][self.player.y][Channels.ENTITY] = Entities.CHEST
             self.chests.append((self.player.x, self.player.y))
-        self.new_reward = -500
+            self.new_reward = -500
         # print("PLACEMENT: Chest placed at x:{} y:{}".format(self.player.x, self.player.y))
 
     def __init__(self, level: LevelSelection, seed: int, frame_skip: int, human_control: bool,
@@ -308,7 +361,7 @@ class FactEnv(Environment):
             {"observation": PlanarMapsObservationSpace(np.array([100, 100, len(Channels)]), low=0, high=20)}
         )
         self.init_env()
-        self.action_space = DiscreteActionSpace(num_actions=12,
+        self.action_space = DiscreteActionSpace(num_actions=21,
                                                 descriptions={"0": "up", "1": "down", "2": "left", "3": "right",
                                                               "4": "up-left", "5": "up-right", "6": "down-left",
                                                               "7": "down-right", "8": "mine-up", "9": "mine-down",
@@ -331,10 +384,18 @@ class FactEnv(Environment):
         self.update_map()
         self.done = False
         self.reward = self.new_reward
-        if self.total_reward_in_current_episode < -100000:
+        if self.done:
+            pass
+        elif self.total_reward_in_current_episode < self.minimum_reward:
             self.done = True
+            self.logger.info("[TERMINATION]: Exceed minimum reward")
         elif len(self.chests) > 0:
-            self.done = self.map[self.chests[0][0]][self.chests[0][1]][3] > 0
+            for chest in self.chests:
+                if self.map[chest[0]][chest[1]][Channels.CONTENT] > 0:
+                    self.done = True
+                    self.reward = 10000
+                    self.logger.info("[DONE]: CHEST AT x:{} y:{} CONTAINS RESULT!!!!!!!!!!!!!!!!!!!!!!!!!!!!!".format(chest[0], chest[1]))
+                    break
         self.state = {"observation": self.map}
 
     def _restart_environment_episode(self, force_environment_reset=False) -> None:
@@ -342,6 +403,8 @@ class FactEnv(Environment):
         self.logger.info("[MAP UPDATE]: Belts count: {}".format(len(self.belts)))
         self.logger.info("[MAP UPDATE]: Inserters count: {}".format(len(self.inserters)))
         self.logger.info("[MAP UPDATE]: Chests count: {}".format(len(self.chests)))
+        del self.map
+        gc.collect()
         self.init_env()
 
 
