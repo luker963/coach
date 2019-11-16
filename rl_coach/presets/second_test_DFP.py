@@ -1,3 +1,4 @@
+from rl_coach.agents.dfp_agent import DFPAgentParameters
 from rl_coach.memories.memory import MemoryGranularity
 
 from rl_coach.memories.non_episodic import ExperienceReplayParameters
@@ -15,7 +16,7 @@ from rl_coach.graph_managers.graph_manager import SimpleSchedule
 
 experience_replay_parameters = ExperienceReplayParameters()
 experience_replay_parameters.max_size = (MemoryGranularity.Transitions, 10000)
-agent_params = DQNAgentParameters()
+agent_params = DFPAgentParameters()
 agent_params.memory = experience_replay_parameters
 schedule_params = SimpleSchedule()
 schedule_params.heatup_steps = EnvironmentSteps(10)
