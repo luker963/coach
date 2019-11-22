@@ -1,3 +1,4 @@
+pysc2
 annoy>=1.8.3
 Pillow>=4.3.0
 matplotlib>=2.0.2

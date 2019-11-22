@@ -60,10 +60,13 @@ class Player:
 
 
 class FactEnv(Environment):
+    ore_coord_x = None
+    ore_coord_y = None
     map_height = map_width = 50
     map = None
     player = None
     miners = None
+    wrong_miners = None
     inserters = None
     belts = None
     chests = None
@@ -98,12 +101,15 @@ class FactEnv(Environment):
             self.map[x + 1][y][channel] = value
 
     def spawn_ore(self):
-        ore_coord_x = np.random.randint(10, 40)
-        ore_coord_y = np.random.randint(10, 40)
-        for x in range(ore_coord_x - 5, ore_coord_x + 5):
-            dist = 5 - np.abs(x - ore_coord_x)
-            for y in range(ore_coord_y - dist, ore_coord_y + dist):
-                self.map[x][y][Channels.ORE] = 1
+        self.ore_coord_x = np.random.randint(0, 49)
+        self.ore_coord_y = np.random.randint(0, 49)
+        self.map[self.ore_coord_x][self.ore_coord_y][Channels.ORE] = 1
+        # self.ore_coord_x = np.random.randint(10, 40)
+        # self.ore_coord_y = np.random.randint(10, 40)
+        # for x in range(self.ore_coord_x - 5, self.ore_coord_x + 5):
+        #     dist = 5 - np.abs(x - self.ore_coord_x)
+        #     for y in range(self.ore_coord_y - dist, self.ore_coord_y + dist):
+        #         self.map[x][y][Channels.ORE] = 1
 
     def update_map(self):
         self.logger.debug("[MAP UPDATE]: Starting map update")
@@ -185,15 +191,16 @@ class FactEnv(Environment):
     #   [x][y][3] content of entity
 
     def init_env(self):
-        self.map = np.zeros((self.map_height, self.map_width, len(Channels)))
+        self.map = np.zeros((self.map_height, self.map_width, 4))
         self.spawn_ore()
         self.player = Player()
         self.miners = []
+        self.wrong_miners = 0
         self.inserters = []
         self.belts = []
         self.chests = []
         self.new_reward = 0
-        self.minimum_reward = -100000
+        self.minimum_reward = -1000000
 
     def _move_player(self, action_idx):
         old_player = Player(self.player.x, self.player.y)
@@ -206,24 +213,25 @@ class FactEnv(Environment):
             self.player.x -= 1
         if action_idx == 3:
             self.player.x += 1
-        if action_idx == 4:
-            self.player.y += 1
-            self.player.x -= 1
-        if action_idx == 5:
-            self.player.y += 1
-            self.player.x += 1
-        if action_idx == 6:
-            self.player.x -= 1
-            self.player.y -= 1
-        if action_idx == 7:
-            self.player.x += 1
-            self.player.y -= 1
+        # if action_idx == 4:
+        #     self.player.y += 1
+        #     self.player.x -= 1
+        # if action_idx == 5:
+        #     self.player.y += 1
+        #     self.player.x += 1
+        # if action_idx == 6:
+        #     self.player.x -= 1
+        #     self.player.y -= 1
+        # if action_idx == 7:
+        #     self.player.x += 1
+        #     self.player.y -= 1
         if 0 > self.player.x or self.player.x >= self.map_width or 0 > self.player.y or self.player.y >= self.map_height:
-            # self.new_reward += -100
+            self.new_reward -= np.abs(self.player.x - self.ore_coord_x) + np.abs(self.player.y - self.ore_coord_y)
             self.player = old_player
             self.map[self.player.x][self.player.y][Channels.PLAYER] = 1
         else:
             self.map[self.player.x][self.player.y][Channels.PLAYER] = 1
+            self.new_reward -= np.abs(self.player.x - self.ore_coord_x) + np.abs(self.player.y - self.ore_coord_y)
             # self.new_reward += -50
 
     def _place_oriented(self, action_idx):
@@ -237,37 +245,38 @@ class FactEnv(Environment):
         elif action_idx < 12:  # MINER
             if self.map[self.player.x][self.player.y][Channels.ORE] == 1:  # if ore is present
                 self.map[self.player.x][self.player.y][Channels.ENTITY] = Entities.MINER
-                if action_idx == 8:
-                    self.map[self.player.x][self.player.y][Channels.UP] = 1
-                    if self.map[self.player.x][self.player.y + 1][Channels.ENTITY] == Entities.BELT and not \
-                            self.map[self.player.x][self.player.y + 1][Channels.DOWN]:
-                        self.new_reward += 2000
-                        self.logger.info("[PLACEMENT]: Miner placed next to the belt")
-                elif action_idx == 9:
-                    self.map[self.player.x][self.player.y][Channels.DOWN] = 1
-                    if self.map[self.player.x][self.player.y - 1][Channels.ENTITY] == Entities.BELT and not \
-                            self.map[self.player.x][self.player.y - 1][Channels.UP]:
-                        self.new_reward += 2000
-                        self.logger.info("[PLACEMENT]: Miner placed next to the belt")
-                elif action_idx == 10:
-                    self.map[self.player.x][self.player.y][Channels.LEFT] = 1
-                    if self.map[self.player.x - 1][self.player.y][Channels.ENTITY] == Entities.BELT and not \
-                            self.map[self.player.x - 1][self.player.y][Channels.RIGHT]:
-                        self.new_reward += 2000
-                        self.logger.info("[PLACEMENT]: Miner placed next to the belt")
-                elif action_idx == 11:
-                    self.map[self.player.x][self.player.y][Channels.RIGHT] = 1
-                    if self.map[self.player.x + 1][self.player.y][Channels.ENTITY] == Entities.BELT and not \
-                            self.map[self.player.x + 1][self.player.y][Channels.LEFT]:
-                        self.new_reward += 2000
-                        self.logger.info("[PLACEMENT]: Miner placed next to the belt")
+                # if action_idx == 8:
+                #     self.map[self.player.x][self.player.y][Channels.UP] = 1
+                #     if self.map[self.player.x][self.player.y + 1][Channels.ENTITY] == Entities.BELT and not \
+                #             self.map[self.player.x][self.player.y + 1][Channels.DOWN]:
+                #         self.new_reward += 2000
+                #         self.logger.info("[PLACEMENT]: Miner placed next to the belt")
+                # elif action_idx == 9:
+                #     self.map[self.player.x][self.player.y][Channels.DOWN] = 1
+                #     if self.map[self.player.x][self.player.y - 1][Channels.ENTITY] == Entities.BELT and not \
+                #             self.map[self.player.x][self.player.y - 1][Channels.UP]:
+                #         self.new_reward += 2000
+                #         self.logger.info("[PLACEMENT]: Miner placed next to the belt")
+                # elif action_idx == 10:
+                #     self.map[self.player.x][self.player.y][Channels.LEFT] = 1
+                #     if self.map[self.player.x - 1][self.player.y][Channels.ENTITY] == Entities.BELT and not \
+                #             self.map[self.player.x - 1][self.player.y][Channels.RIGHT]:
+                #         self.new_reward += 2000
+                #         self.logger.info("[PLACEMENT]: Miner placed next to the belt")
+                # elif action_idx == 11:
+                #     self.map[self.player.x][self.player.y][Channels.RIGHT] = 1
+                #     if self.map[self.player.x + 1][self.player.y][Channels.ENTITY] == Entities.BELT and not \
+                #             self.map[self.player.x + 1][self.player.y][Channels.LEFT]:
+                #         self.new_reward += 2000
+                #         self.logger.info("[PLACEMENT]: Miner placed next to the belt")
                 self.miners.append((self.player.x, self.player.y))
-                self.new_reward += 100
+                self.new_reward += 2000
                 # self.new_reward -= 50*len(self.miners)
                 self.logger.info("[PLACEMENT]: Miner placed at x:{} y:{}".format(self.player.x, self.player.y))
                 # self.minimum_reward = -500000
             else:
-                # self.new_reward = -100
+                self.new_reward = -100
+                self.wrong_miners += 1
                 self.logger.debug("[PLACEMENT]: unable to place miner without ore")
         elif action_idx < 16:  # BELT
             self.map[self.player.x][self.player.y][Channels.ENTITY] = Entities.BELT
@@ -372,22 +381,17 @@ class FactEnv(Environment):
         super().__init__(level, seed, frame_skip, human_control, custom_reward_threshold, visualization_parameters,
                          **kwargs)
         self.state_space = StateSpace(
-            {"observation": PlanarMapsObservationSpace(np.array([self.map_height, self.map_width, len(Channels)]), low=0, high=20)}
+            {"observation": PlanarMapsObservationSpace(np.array([self.map_height, self.map_width, 4]), low=0, high=1)}
         )
         self.init_env()
-        self.action_space = DiscreteActionSpace(num_actions=21,
+        self.action_space = DiscreteActionSpace(num_actions=5,
                                                 descriptions={"0": "up", "1": "down", "2": "left", "3": "right",
                                                               "4": "up-left", "5": "up-right", "6": "down-left",
-                                                              "7": "down-right", "8": "mine-up", "9": "mine-down",
-                                                              "10": "mine-left", "11": "mine-right", "12": "belt-up",
-                                                              "13": "belt-down", "14": "belt-left", "15": "belt-right",
-                                                              "16": "inserter-up", "17": "inserter-down",
-                                                              "18": "inserter-left", "19": "inserter-right",
-                                                              "20": "chest"})
+                                                              "7": "down-right", "8": "mine-up"})
 
     def _take_action(self, action_idx: ActionType) -> None:
         self.new_reward = 0
-        if action_idx < 8:
+        if action_idx < 4:
             self._move_player(action_idx)
         elif action_idx < 20:
             self._place_oriented(action_idx)
@@ -395,7 +399,7 @@ class FactEnv(Environment):
             self._place_invariant(action_idx)
 
     def _update_state(self) -> None:
-        self.update_map()
+        # self.update_map()
         self.done = False
         self.reward = self.new_reward
         if self.done:
@@ -403,26 +407,22 @@ class FactEnv(Environment):
         elif self.total_reward_in_current_episode < self.minimum_reward:
             self.done = True
             self.logger.info("[TERMINATION]: Exceed minimum reward")
-        elif len(self.chests) > 0:
-            for chest in self.chests:
-                if self.map[chest[0]][chest[1]][Channels.CONTENT] > 0:
-                    self.done = True
-                    self.reward = 3000
-                    self.logger.info("[DONE]: CHEST AT x:{} y:{} CONTAINS RESULT!!!!!!!!!!!!!!!!!!!!!!!!!!!!!".format(chest[0], chest[1]))
-                    break
-        if self.current_episode_steps_counter > 100:
+        elif len(self.miners) > 0:
+            self.logger.info("[DONE]: MINER AT x:{} y:{} PLACED!!!!!!!!!!!!!!!!!!!!!!!!!!!!!".format(self.miners[0][0], self.miners[0][1]))
             self.done = True
-            self.logger.info("[TERMINATION]: Current episode steps counter exceeded 5000")
+        if self.current_episode_steps_counter > 200:
+            self.done = True
+            self.logger.info("[TERMINATION]: Current episode steps counter exceeded 1000000")
 
         self.state = {"observation": self.map}
+        if self.done:
+            self.logger.info("[MAP UPDATE]: Miners count: {}".format(len(self.miners)))
+            self.logger.info("[MAP UPDATE]: Wrong miners count: {}".format(self.wrong_miners))
+            # self.logger.info("[MAP UPDATE]: Belts count: {}".format(len(self.belts)))
+            # self.logger.info("[MAP UPDATE]: Inserters count: {}".format(len(self.inserters)))
+            # self.logger.info("[MAP UPDATE]: Chests count: {}".format(len(self.chests)))
 
     def _restart_environment_episode(self, force_environment_reset=False) -> None:
-        self.logger.info("[MAP UPDATE]: Miners count: {}".format(len(self.miners)))
-        self.logger.info("[MAP UPDATE]: Belts count: {}".format(len(self.belts)))
-        self.logger.info("[MAP UPDATE]: Inserters count: {}".format(len(self.inserters)))
-        self.logger.info("[MAP UPDATE]: Chests count: {}".format(len(self.chests)))
-        del self.map
-        gc.collect()
         self.init_env()
 
 

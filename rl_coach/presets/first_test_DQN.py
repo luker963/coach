@@ -5,7 +5,7 @@ from rl_coach.core_types import EnvironmentSteps, TrainingSteps
 from rl_coach.base_parameters import VisualizationParameters, PresetValidationParameters
 from rl_coach.graph_managers.basic_rl_graph_manager import BasicRLGraphManager
 from rl_coach.environments.first_test import ControlSuiteEnvironmentParameters
-
+from rl_coach.memories.memory import MemoryGranularity
 
 agent_params = DQNAgentParameters()
 # rename the input embedder key from 'observation' to 'measurements'
@@ -16,6 +16,7 @@ preset_validation_params = PresetValidationParameters()
 # preset_validation_params.test = True
 # preset_validation_params.min_reward_threshold = 20
 # preset_validation_params.max_episodes_to_achieve_reward = 400
+agent_params.memory.max_size = (MemoryGranularity.Transitions, 5000)
 
 vis_params = VisualizationParameters(render=False)
 
