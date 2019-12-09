@@ -1,4 +1,5 @@
 from rl_coach.agents.actor_critic_agent import ActorCriticAgentParameters
+from rl_coach.architectures.embedder_parameters import InputEmbedderParameters
 
 from rl_coach.memories.memory import MemoryGranularity
 
@@ -9,15 +10,18 @@ from rl_coach.exploration_policies.e_greedy import EGreedyParameters
 from rl_coach.agents.dqn_agent import DQNAgentParameters, DQNAlgorithmParameters, DQNNetworkParameters
 
 from rl_coach.agents.rainbow_dqn_agent import RainbowDQNAgentParameters
-from rl_coach.base_parameters import PresetValidationParameters, VisualizationParameters, AgentParameters
+from rl_coach.base_parameters import PresetValidationParameters, VisualizationParameters, AgentParameters, \
+    EmbedderScheme
 from rl_coach.core_types import EnvironmentSteps
 from rl_coach.environments.second_test import ControlSuiteEnvironmentParameters
 from rl_coach.graph_managers.basic_rl_graph_manager import BasicRLGraphManager
 from rl_coach.graph_managers.graph_manager import SimpleSchedule
 
 agent_params = ActorCriticAgentParameters()
+agent_params.network_wrappers['main'].input_embedders_parameters['observation'].scheme = EmbedderScheme.Shallow
+# agent_params.network_wrappers['main'].input_embedders_parameters['player'] = InputEmbedderParameters()
 schedule_params = SimpleSchedule()
-preset_validation_params = PresetValidationParameters(test=True, min_reward_threshold=-50000, max_episodes_to_achieve_reward=10, num_workers=5)
+preset_validation_params = PresetValidationParameters(test=False, min_reward_threshold=-50000, max_episodes_to_achieve_reward=10, num_workers=5)
 vis_params = VisualizationParameters(render=False)
 
 env_params = ControlSuiteEnvironmentParameters()

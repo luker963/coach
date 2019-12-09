@@ -384,7 +384,7 @@ class GraphManager(object):
                 # act for at least steps, though don't interrupt an episode
                 count_end = self.current_step_counter + steps
                 while self.current_step_counter < count_end:
-                    self.act(EnvironmentEpisodes(1))
+                    self.act(EnvironmentSteps(1))
 
     def handle_episode_ended(self) -> None:
         """

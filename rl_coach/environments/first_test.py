@@ -84,7 +84,7 @@ class TestCls(Environment):
         # self.done = ((self.env.player.x == self.env.target['x']) and (self.env.player.y == self.env.target['y'])) or (np.abs(self.env.player.x) > 80 or np.abs(self.env.player.y) > 80)
         self.done = (np.abs(self.env.player.x) > 80 or np.abs(
             self.env.player.y) > 80) or self.total_reward_in_current_episode < self.reward_limit or ((self.env.player.x == self.env.target['x']) and (self.env.player.y == self.env.target['y']))
-
+        # self.done = self.current_episode_steps_counter > 2500
         self.state = {
             "observation": np.array([self.env.player.x, self.env.player.y, self.env.target['x'], self.env.target['y']])
             # "observation": self.env.observation
