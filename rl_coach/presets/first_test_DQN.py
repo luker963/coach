@@ -3,7 +3,7 @@ from rl_coach.agents.dqn_agent import DQNAgentParameters
 from rl_coach.architectures.embedder_parameters import InputEmbedderParameters
 from rl_coach.architectures.middleware_parameters import FCMiddlewareParameters
 from rl_coach.graph_managers.graph_manager import SimpleSchedule, SimpleScheduleWithoutEvaluation
-from rl_coach.core_types import EnvironmentSteps, TrainingSteps
+from rl_coach.core_types import EnvironmentSteps, TrainingSteps, AlwaysDumpFilter
 from rl_coach.base_parameters import VisualizationParameters, PresetValidationParameters, MiddlewareScheme, \
     EmbedderScheme
 from rl_coach.graph_managers.basic_rl_graph_manager import BasicRLGraphManager
@@ -25,11 +25,11 @@ preset_validation_params = PresetValidationParameters()
 # preset_validation_params.min_reward_threshold = 20
 # preset_validation_params.max_episodes_to_achieve_reward = 400
 
-vis_params = VisualizationParameters(render=False)
+vis_params = VisualizationParameters(dump_gifs=True, video_dump_methods=AlwaysDumpFilter())
 
 env_params = ControlSuiteEnvironmentParameters()
 
 
 graph_manager = BasicRLGraphManager(agent_params=agent_params, env_params=env_params,
-                                    schedule_params=schedule_params, vis_params=VisualizationParameters(),
+                                    schedule_params=schedule_params, vis_params=vis_params,
                                     preset_validation_params=preset_validation_params)

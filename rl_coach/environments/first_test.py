@@ -82,7 +82,7 @@ class TestCls(Environment):
         self.reward = new_reward
         # self.goal = np.array([self.env.target['x'], self.env.target['y'], self.env.target['x'], self.env.target['y']])
         # self.done = ((self.env.player.x == self.env.target['x']) and (self.env.player.y == self.env.target['y'])) or (np.abs(self.env.player.x) > 80 or np.abs(self.env.player.y) > 80)
-        self.done = (self.env.target['x'] == 24 and self.env.target['y'] == 24) or self.env.target['x'] <= 0 or self.env.target['y'] <= 0 or self.env.target['x'] >= 49 or self.env.target['y'] >= 49 or self.current_episode_steps_counter > 1000
+        self.done = (self.env.target['x'] == 24 and self.env.target['y'] == 24) or self.env.target['x'] <= 0 or self.env.target['y'] <= 0 or self.env.target['x'] >= 49 or self.env.target['y'] >= 49 or self.current_episode_steps_counter > 100
         self.state = {
             # "observation": np.array([self.env.player.x, self.env.player.y, self.env.target['x'], self.env.target['y']])
             "observation": self.env.observation
@@ -105,7 +105,7 @@ class TestCls(Environment):
         self.reward_limit = -np.power(np.sum(np.arange(1 + np.abs(self.env.target['x']) + np.abs(self.env.target['y'])))/2, 2)
 
     def get_rendered_image(self):
-        return self.env.map
+        return self.env.observation
 
 
 class ControlSuiteEnvironmentParameters(EnvironmentParameters):
