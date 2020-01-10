@@ -105,7 +105,16 @@ class TestCls(Environment):
         self.reward_limit = -np.power(np.sum(np.arange(1 + np.abs(self.env.target['x']) + np.abs(self.env.target['y'])))/2, 2)
 
     def get_rendered_image(self):
-        return self.env.observation
+        image_map = np.copy(self.env.observation).astype(float)
+        image_map[image_map == 0] = 255
+        image_map[image_map == 1] = 170
+        # new_image = np.zeros((50, 50, 3))
+        # image_map = np.expand_dims(image_map, 2)
+        # new_image[:, :, :] = image_map[:, :]
+        # new_image[new_image == 1] = (255, 0, 0)
+        # image_map[image_map == 0] = 50
+        # image_map[self.player.x, self.player.y] = [0, 255, 0]
+        return image_map
 
 
 class ControlSuiteEnvironmentParameters(EnvironmentParameters):
