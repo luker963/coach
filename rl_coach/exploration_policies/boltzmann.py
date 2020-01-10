@@ -56,9 +56,9 @@ class Boltzmann(DiscreteActionExplorationPolicy):
         exp_probabilities = np.exp(action_values / self.temperature_schedule.current_value)
         probabilities = exp_probabilities / np.sum(exp_probabilities)
         # make sure probs sum to 1
-        probabilities[-1] = 1 - np.sum(probabilities[:-1])
+        # probabilities[-1] = 1 - np.sum(probabilities[:-1])
         # choose actions according to the probabilities
-        action = np.random.choice(range(self.action_space.shape), p=probabilities)
+        action = np.random.choice(range(len(self.action_space.actions)), p=probabilities[0])
         return action, probabilities
 
     def get_control_param(self):

@@ -219,43 +219,43 @@ class FactEnv(Environment):
             self.player.x += 1
             self.player.y -= 1
         if 0 > self.player.x or self.player.x >= self.map_width or 0 > self.player.y or self.player.y >= self.map_height:
-            # self.new_reward += -100
+            self.new_reward += -100
             self.player = old_player
             self.map[self.player.x][self.player.y][Channels.PLAYER] = 1
         else:
             self.map[self.player.x][self.player.y][Channels.PLAYER] = 1
-            # self.new_reward += -50
+            self.new_reward += -50
 
     def _place_oriented(self, action_idx):
         if 1 > self.player.x or self.player.x > self.map_width - 2 or 1 > self.player.y or self.player.y > self.map_height - 2:  # out of map bound
             pass
-            # self.new_reward = -500
+            self.new_reward = -500
         elif self.map[self.player.x][self.player.y][Channels.ENTITY] > 0:  # placing on top of something
             pass
-            # self.new_reward = -500
+            self.new_reward = -500
             # print("PLACEMENT: unable to place, there is already {}".format(self.map[self.player.x][self.player.y][0]))
-        elif action_idx < 12:  # MINER
+        elif action_idx < 8:  # MINER
             if self.map[self.player.x][self.player.y][Channels.ORE] == 1:  # if ore is present
                 self.map[self.player.x][self.player.y][Channels.ENTITY] = Entities.MINER
-                if action_idx == 8:
+                if action_idx == 4:
                     self.map[self.player.x][self.player.y][Channels.UP] = 1
                     if self.map[self.player.x][self.player.y + 1][Channels.ENTITY] == Entities.BELT and not \
                             self.map[self.player.x][self.player.y + 1][Channels.DOWN]:
                         self.new_reward += 2000
                         self.logger.info("[PLACEMENT]: Miner placed next to the belt")
-                elif action_idx == 9:
+                elif action_idx == 5:
                     self.map[self.player.x][self.player.y][Channels.DOWN] = 1
                     if self.map[self.player.x][self.player.y - 1][Channels.ENTITY] == Entities.BELT and not \
                             self.map[self.player.x][self.player.y - 1][Channels.UP]:
                         self.new_reward += 2000
                         self.logger.info("[PLACEMENT]: Miner placed next to the belt")
-                elif action_idx == 10:
+                elif action_idx == 6:
                     self.map[self.player.x][self.player.y][Channels.LEFT] = 1
                     if self.map[self.player.x - 1][self.player.y][Channels.ENTITY] == Entities.BELT and not \
                             self.map[self.player.x - 1][self.player.y][Channels.RIGHT]:
                         self.new_reward += 2000
                         self.logger.info("[PLACEMENT]: Miner placed next to the belt")
-                elif action_idx == 11:
+                elif action_idx == 7:
                     self.map[self.player.x][self.player.y][Channels.RIGHT] = 1
                     if self.map[self.player.x + 1][self.player.y][Channels.ENTITY] == Entities.BELT and not \
                             self.map[self.player.x + 1][self.player.y][Channels.LEFT]:
@@ -267,7 +267,7 @@ class FactEnv(Environment):
                 self.logger.info("[PLACEMENT]: Miner placed at x:{} y:{}".format(self.player.x, self.player.y))
                 # self.minimum_reward = -500000
             else:
-                # self.new_reward = -100
+                self.new_reward = -100
                 self.logger.debug("[PLACEMENT]: unable to place miner without ore")
         elif action_idx < 16:  # BELT
             self.map[self.player.x][self.player.y][Channels.ENTITY] = Entities.BELT
@@ -319,7 +319,7 @@ class FactEnv(Environment):
                         else:  # ak ma belt v origine orientaciu kolidujucu s beltom v okoli
                             self.new_reward += -500
                             self.logger.info("[PLACEMENT]: Belt placed next to the miner but WRONG")
-            # self.new_reward -= 50 * len(self.belts)
+            self.new_reward -= 50 * len(self.belts)
             # print("PLACEMENT: Belt placed at x:{} y:{}".format(self.player.x, self.player.y))
         elif action_idx < 20:  # INSERTER
             self.map[self.player.x][self.player.y][Channels.ENTITY] = Entities.INSERTER
@@ -356,14 +356,14 @@ class FactEnv(Environment):
                                                    Orientations.RIGHT) == Entities.CHEST:
                     self.new_reward += 1000
             self.inserters.append((self.player.x, self.player.y))
-            # self.new_reward -= 50 * len(self.inserters)
+            self.new_reward -= 50 * len(self.inserters)
             # print("PLACEMENT: Inserter placed at x:{} y:{}".format(self.player.x, self.player.y))
 
     def _place_invariant(self, action_idx):
         if action_idx == 20:  # CHEST
             self.map[self.player.x][self.player.y][Channels.ENTITY] = Entities.CHEST
             self.chests.append((self.player.x, self.player.y))
-            # self.new_reward = -500 * len(self.chests)
+            self.new_reward = -500
         # print("PLACEMENT: Chest placed at x:{} y:{}".format(self.player.x, self.player.y))
 
     def __init__(self, level: LevelSelection, seed: int, frame_skip: int, human_control: bool,
@@ -377,19 +377,14 @@ class FactEnv(Environment):
         self.init_env()
         self.action_space = DiscreteActionSpace(num_actions=21,
                                                 descriptions={"0": "up", "1": "down", "2": "left", "3": "right",
-                                                              "4": "up-left", "5": "up-right", "6": "down-left",
-                                                              "7": "down-right", "8": "mine-up", "9": "mine-down",
-                                                              "10": "mine-left", "11": "mine-right", "12": "belt-up",
-                                                              "13": "belt-down", "14": "belt-left", "15": "belt-right",
-                                                              "16": "inserter-up", "17": "inserter-down",
-                                                              "18": "inserter-left", "19": "inserter-right",
-                                                              "20": "chest"})
+                                                              "4": "mine-up", "5": "mine-down",
+                                                              "6": "mine-left", "7": "mine-right", "8": "chest"})
 
     def _take_action(self, action_idx: ActionType) -> None:
         self.new_reward = 0
-        if action_idx < 8:
+        if action_idx < 5:
             self._move_player(action_idx)
-        elif action_idx < 20:
+        elif action_idx < 8:
             self._place_oriented(action_idx)
         else:
             self._place_invariant(action_idx)
@@ -400,9 +395,9 @@ class FactEnv(Environment):
         self.reward = self.new_reward
         if self.done:
             pass
-        elif self.total_reward_in_current_episode < self.minimum_reward:
-            self.done = True
-            self.logger.info("[TERMINATION]: Exceed minimum reward")
+        # elif self.total_reward_in_current_episode < self.minimum_reward:
+        #     self.done = True
+        #     self.logger.info("[TERMINATION]: Exceed minimum reward")
         elif len(self.chests) > 0:
             for chest in self.chests:
                 if self.map[chest[0]][chest[1]][Channels.CONTENT] > 0:
@@ -410,9 +405,9 @@ class FactEnv(Environment):
                     self.reward = 3000
                     self.logger.info("[DONE]: CHEST AT x:{} y:{} CONTAINS RESULT!!!!!!!!!!!!!!!!!!!!!!!!!!!!!".format(chest[0], chest[1]))
                     break
-        if self.current_episode_steps_counter > 100:
+        if self.current_episode_steps_counter > 1000:
             self.done = True
-            self.logger.info("[TERMINATION]: Current episode steps counter exceeded 5000")
+            self.logger.info("[TERMINATION]: Current episode steps counter exceeded 1000")
 
         self.state = {"observation": self.map}
 
