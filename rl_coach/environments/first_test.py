@@ -9,15 +9,28 @@ from rl_coach.filters.filter import NoInputFilter, NoOutputFilter
 from typing import Union
 
 
+class Movements:
+    wrongs = 0
+    actions_counter = None
+
+    def __init__(self, action_space):
+        self.actions_counter = np.zeros(len(action_space.actions))
+
+
 class GameMap:
     height = 50
     width = 50
     plane = []
+    target_x = 0
+    target_y = 0
 
-    def __init__(self, height: int, width: int):
+    def __init__(self, height: int, width: int, target_x: int, target_y: int):
         self.height = height
         self.width = width
         self.plane = np.zeros((self.height, self.width, 1), dtype=float)
+        self.target_x = target_x
+        self.target_y = target_y
+        self.plane[target_x][target_y][0] = 1
 
 
 class Player:
@@ -30,24 +43,20 @@ class Player:
 
 
 class FacEnv:
-    target = None
-    wrongs = None
+    game_map = None
     observation = None
     map_size = 50
+    player = None
 
     def __init__(self):
-        self.wrongs = 0
-        # self.target = {'x': 2, 'y': 2}
-        self.target = {'x': np.random.randint(1, self.map_size - 2), 'y': np.random.randint(1, self.map_size - 2)}
-        print("x: " + str(self.target['x']) + ", y: " + str(self.target['y']))
-        self.observation = np.zeros((self.map_size, self.map_size, 1), dtype=float)
-        # setting target
-        self.observation[self.target['x']][self.target['y']][0] = 1
-        self.observation[int(self.map_size / 2)][int(self.map_size / 2)][0] = -1
+        self.game_map = GameMap(self.map_size, self.map_size, np.random.randint(1, self.map_size - 2), np.random.randint(1, self.map_size - 2))
+        self.player = Player(int(self.map_size / 2), int(self.map_size / 2))
+        print("Destination x: " + str(self.game_map.target_x) + ", y: " + str(self.game_map.target_y))
+        self.observation = self.game_map.plane
+        self.observation[self.player.x][self.player.y][0] = -1
 
 
 class TestCls(Environment):
-    env = None
     out_of_map_reward = 0
     actions = {}
 
@@ -62,98 +71,83 @@ class TestCls(Environment):
             "observation": PlanarMapsObservationSpace(shape=np.array([self.env.map_size, self.env.map_size, 1]), low=-1,
                                                       high=2)
         })
-        # self.goal_space = VectorObservationSpace(shape=4)
-        # self.state_space = PlanarMapsObservationSpace(shape=np.array([84, 84, 2]), low=0, high=1)
         self.action_space = DiscreteActionSpace(num_actions=9,
                                                 descriptions={"0": "up", "1": "down", "2": "left", "3": "right"})
+        self.movements = Movements(self.action_space)
 
     def _take_action(self, action_idx: ActionType) -> None:
-        self.env.observation[self.env.target['x']][self.env.target['y']][0] = 0
-        if int(action_idx) in self.actions:
-            self.actions[int(action_idx)] += 1
-        else:
-            self.actions[int(action_idx)] = 1
+        self.env.observation[self.env.player.x][self.env.player.y][0] = 0
+        self.movements.actions_counter[action_idx] += 1
         if action_idx == 0:
-            self.env.target['y'] += 1
+            self.env.player.y += 1
         elif action_idx == 1:
-            self.env.target['y'] -= 1
+            self.env.player.y -= 1
         elif action_idx == 2:
-            self.env.target['x'] -= 1
+            self.env.player.x -= 1
         elif action_idx == 3:
-            self.env.target['x'] += 1
+            self.env.player.x += 1
         elif action_idx == 4:
-            self.env.target['y'] += 1
-            self.env.target['x'] += 1
+            self.env.player.y += 1
+            self.env.player.x += 1
         elif action_idx == 5:
-            self.env.target['y'] -= 1
-            self.env.target['x'] += 1
+            self.env.player.y -= 1
+            self.env.player.x += 1
         elif action_idx == 6:
-            self.env.target['y'] += 1
-            self.env.target['x'] -= 1
+            self.env.player.y += 1
+            self.env.player.x -= 1
         elif action_idx == 7:
-            self.env.target['y'] -= 1
-            self.env.target['x'] -= 1
+            self.env.player.y -= 1
+            self.env.player.x -= 1
 
-        if self.env.target['x'] == 0:
-            self.env.target['x'] = 1
-        if self.env.target['y'] == 0:
-            self.env.target['y'] = 1
-        if self.env.target['x'] == self.env.map_size - 1:
-            self.env.target['x'] = self.env.map_size - 2
-        if self.env.target['y'] == self.env.map_size - 1:
-            self.env.target['y'] = self.env.map_size - 2
+        if self.env.player.x == 0:
+            self.env.player.x = 1
+        if self.env.player.y == 0:
+            self.env.player.y = 1
+        if self.env.player.x == self.env.map_size - 1:
+            self.env.player.x = self.env.map_size - 2
+        if self.env.player.y == self.env.map_size - 1:
+            self.env.player.y = self.env.map_size - 2
 
-        self.env.observation[int(self.env.map_size / 2)][int(self.env.map_size / 2)][0] = -1
-        self.env.observation[self.env.target['x']][self.env.target['y']][0] = 1
+        self.env.observation[self.env.player.x][self.env.player.y][0] = -1
+        self.env.observation[self.env.game_map.target_x][self.env.game_map.target_y][0] = 1
         if action_idx == 8:
-            # print("MINER: x - " + str(self.env.target['x']) + ", y - " + str(self.env.target['y']))
-            if self.env.target['x'] == int(self.env.map_size / 2) and self.env.target['y'] == int(self.env.map_size / 2):
-                self.env.observation[self.env.target['x']][self.env.target['y']][0] = 2
-        # print("Moved to: ", self.env.target['x'], ", ", self.env.target['y'])
+            if self.env.game_map.target_x == self.env.player.x and self.env.game_map.target_y == self.env.player.y:
+                self.env.observation[self.env.player.x][self.env.player.y][0] = 2
 
     def _update_state(self) -> None:
-        if self.env.observation[int(self.env.map_size/2)][int(self.env.map_size/2)][0] == 2:
+        if self.env.observation[self.env.player.x][self.env.player.y][0] == 2:
             self.finish_reward = 10000
         else:
             self.finish_reward = 0
-        self.movement_reward = -(np.abs(int(self.env.map_size/2) - self.env.target['x']) +
-                                 np.abs(int(self.env.map_size/2) - self.env.target['y']))
+        self.movement_reward = -(np.abs(self.env.player.x - self.env.game_map.target_x) +
+                                 np.abs(self.env.player.y - self.env.game_map.target_y))
         self.done = (#(self.env.target['x'] == int(self.env.map_size/2) and
                      #self.env.target['y'] == int(self.env.map_size/2)) or
-                     self.env.observation[int(self.env.map_size/2)][int(self.env.map_size/2)][0] == 2 or
+                     self.env.observation[self.env.game_map.target_x][self.env.game_map.target_y][0] == 2 or
                      self.current_episode_steps_counter > 200) #or
                      #self.env.target['x'] <= 0 or
                      #self.env.target['y'] <= 0 or
                      #self.env.target['x'] >= self.env.map_size-1 or
                      #self.env.target['y'] >= self.env.map_size-1)
-        if self.env.target['x'] == int(self.env.map_size/2) and self.env.target['y'] == int(self.env.map_size/2):
-            print("MIDDLE")
         self.state = {"observation": self.env.observation}
         new_reward = self.out_of_map_reward + self.movement_reward + self.finish_reward
-        if self.reward < new_reward:
-            self.env.wrongs += 1
+        if self.reward >= new_reward:
+            self.movements.wrongs += 1
         self.reward = new_reward
-        self.get_action_from_user()
         self.out_of_map_reward = self.movement_reward = self.finish_reward = 0
 
     def _restart_environment_episode(self, force_environment_reset=False) -> None:
         if self.current_episode_steps_counter != 0:
-            if self.env.observation[int(self.env.map_size/2)][int(self.env.map_size/2)][0] == 2:
+            if self.env.observation[self.env.game_map.target_x][self.env.game_map.target_y][0] == 2:
                 print(
-                    "TARGET after " + str(self.env.wrongs / self.current_episode_steps_counter * 100) + "% wrong steps")
+                    "TARGET after " + str(self.movements.wrongs / self.current_episode_steps_counter * 100) + "% wrong steps")
             else:
-                print("LOST after " + str(self.env.wrongs / self.current_episode_steps_counter * 100) + "% wrong steps")
-        self.env.target = {'x': np.random.randint(1, self.env.map_size-2), 'y': np.random.randint(1, self.env.map_size-2)}
-        # self.env.target = {'x': 34, 'y': 12}
-        self.env.observation = np.zeros((self.env.map_size, self.env.map_size, 1), dtype=float)
-        self.env.observation[self.env.target['x']][self.env.target['y']][0] = 1
-        print("Wrongs: ", self.env.wrongs)
-        for key in self.actions:
-            print(str(key) + ": " + str(self.actions[key]))
-        self.actions = {}
-        print("x: " + str(self.env.target['x']) + ", y: " + str(self.env.target['y']))
-        self.env.wrongs = 0
-        self.env.observation[int(self.env.map_size/2)][int(self.env.map_size/2)][0] = -1
+                print("LOST after " + str(self.movements.wrongs / self.current_episode_steps_counter * 100) + "% wrong steps")
+        print("Wrongs: ", self.movements.wrongs)
+        for index, value in enumerate(self.movements.actions_counter):
+            print(str(index) + ": " + str(value))
+        self.env = FacEnv()
+        self.movements = Movements(self.action_space)
 
     def get_rendered_image(self):
         image_map = np.copy(self.env.observation[:, :, 0]).astype(float)

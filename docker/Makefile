@@ -1,7 +1,7 @@
 REGISTRY=gcr.io
 REGISTRY=docker.io
 ORGANIZATION=nervana
-
+IMAGE=coach
 CONTEXT = $(realpath ..)
 
 BUILD_ARGUMENTS=
