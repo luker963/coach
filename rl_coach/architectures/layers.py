@@ -58,6 +58,7 @@ class Dense(object):
     """
     def __init__(self, units: int):
         self.units = units
+        d = 4
 
     def __str__(self):
         return "Dense (num outputs = {})".format(self.units)

@@ -15,20 +15,20 @@ from rl_coach.environments.first_test import ControlSuiteEnvironmentParameters
 from rl_coach.memories.memory import MemoryGranularity
 from rl_coach.schedules import LinearSchedule
 
-agent_params = DQNAgentParameters()
+agent_params = ActorCriticAgentParameters()
 # agent_params.algorithm.num_steps_between_copying_online_weights_to_target = EnvironmentSteps(100)
-agent_params.exploration.evaluation_epsilon = 0
-agent_params.exploration.epsilon_schedule = LinearSchedule(1, 0, 2000000)
-agent_params.network_wrappers['main'].middleware_parameters.scheme = [Dense(512)]
-agent_params.network_wrappers['main'].input_embedders_parameters = {
-    "observation": InputEmbedderParameters(scheme=EmbedderScheme.Medium)
-}
+# agent_params.exploration.evaluation_epsilon = 0
+# agent_params.exploration.epsilon_schedule = LinearSchedule(1, 0, 1000000)
+# agent_params.network_wrappers['main'].middleware_parameters.scheme = [Dense(512), Dense(512)]
+# agent_params.network_wrappers['main'].input_embedders_parameters = {
+#     "observation": InputEmbedderParameters(scheme=EmbedderScheme.Medium)
+# }
 # agent_params.network_wrappers['main'].replace_mse_with_huber_loss = False
 # agent_params.algorithm.num_consecutive_playing_steps = EnvironmentSteps(1000)
-agent_params.memory.max_size = (MemoryGranularity.Transitions, 500000)
+# agent_params.memory.max_size = (MemoryGranularity.Transitions, 100000)
 schedule_params = SimpleSchedule()
-schedule_params.steps_between_evaluation_periods = EnvironmentEpisodes(20)
-schedule_params.heatup_steps = EnvironmentSteps(20000)
+schedule_params.steps_between_evaluation_periods = EnvironmentEpisodes(10)
+schedule_params.heatup_steps = EnvironmentSteps(2000)
 preset_validation_params = PresetValidationParameters()
 # preset_validation_params.test = True
 # preset_validation_params.min_reward_threshold = 20

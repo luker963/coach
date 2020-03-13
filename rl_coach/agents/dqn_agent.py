@@ -72,6 +72,9 @@ class DQNAgent(ValueOptimizationAgent):
         super().__init__(agent_parameters, parent)
 
     def select_actions(self, next_states, q_st_plus_1):
+        # for index, obs in enumerate(next_states['observation']):
+        #     if obs[int(obs.shape[0]/2)][int(obs.shape[0]/2)] == 1:
+        #         q_st_plus_1[index]=100
         return np.argmax(q_st_plus_1, 1)
 
     def learn_from_batch(self, batch):
@@ -84,7 +87,6 @@ class DQNAgent(ValueOptimizationAgent):
             (self.networks['main'].target_network, batch.next_states(network_keys)),
             (self.networks['main'].online_network, batch.states(network_keys))
         ])
-
         selected_actions = self.select_actions(batch.next_states(network_keys), q_st_plus_1)
 
         # add Q value samples for logging

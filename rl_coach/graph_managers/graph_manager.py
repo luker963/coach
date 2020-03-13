@@ -717,6 +717,7 @@ class GraphManager(object):
             self.memory_backend = get_memory_backend(self.agent_params.memory.memory_backend_params)
 
     def should_stop(self) -> bool:
+        self.level_managers[0].should_stop()
         return self.task_parameters.apply_stop_condition and all([manager.should_stop() for manager in self.level_managers])
 
     def get_data_store(self, param):
