@@ -5,6 +5,7 @@ from rl_coach.agents.dfp_agent import DFPAgentParameters
 from rl_coach.agents.dqn_agent import DQNAgentParameters
 from rl_coach.agents.rainbow_dqn_agent import RainbowDQNAgentParameters
 from rl_coach.architectures.embedder_parameters import InputEmbedderParameters
+from rl_coach.architectures.layers import Dense
 from rl_coach.architectures.middleware_parameters import FCMiddlewareParameters
 from rl_coach.graph_managers.graph_manager import SimpleSchedule, SimpleScheduleWithoutEvaluation
 from rl_coach.core_types import EnvironmentSteps, TrainingSteps, AlwaysDumpFilter, EnvironmentEpisodes
@@ -16,10 +17,17 @@ from rl_coach.memories.memory import MemoryGranularity
 from rl_coach.schedules import LinearSchedule
 
 agent_params = RainbowDQNAgentParameters()
+# agent_params.exploration.epsilon_schedule = LinearSchedule(1, 0, 1000000)
+# agent_params.network_wrappers['main'].middleware_parameters.scheme = [Dense(512)]
+# agent_params.network_wrappers['main'].input_embedders_parameters = {
+#     "observation": InputEmbedderParameters(scheme=EmbedderScheme.Medium)
+# }
+agent_params.memory.max_size = (MemoryGranularity.Transitions, 500000)
 
 schedule_params = SimpleSchedule()
-schedule_params.steps_between_evaluation_periods = EnvironmentEpisodes(50)
+schedule_params.steps_between_evaluation_periods = EnvironmentEpisodes(20)
 schedule_params.heatup_steps = EnvironmentSteps(20000)
+
 preset_validation_params = PresetValidationParameters()
 # preset_validation_params.test = True
 # preset_validation_params.min_reward_threshold = 20

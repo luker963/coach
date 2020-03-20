@@ -20,6 +20,7 @@ class Movements:
 class GameMap:
     height = 50
     width = 50
+    channels = 2
     plane = []
     target_x = 0
     target_y = 0
@@ -27,10 +28,10 @@ class GameMap:
     def __init__(self, height: int, width: int, target_x: int, target_y: int):
         self.height = height
         self.width = width
-        self.plane = np.zeros((self.height, self.width, 1), dtype=int)
+        self.plane = np.zeros((self.height, self.width, self.channels), dtype=int)
         self.target_x = target_x
         self.target_y = target_y
-        self.plane[target_x][target_y][0] = 100
+        self.plane[target_x][target_y][0] = 1
 
 
 class Player:
@@ -46,14 +47,14 @@ class FacEnv:
     game_map = None
     observation = None
     map_size = 50
-    player = None
+    # player = None
 
     def __init__(self):
         self.game_map = GameMap(self.map_size, self.map_size, np.random.randint(1, self.map_size - 2), np.random.randint(1, self.map_size - 2))
-        self.player = Player(int(self.map_size / 2), int(self.map_size / 2))
+        # self.player = Player(int(self.map_size / 2), int(self.map_size / 2))
         print("Destination x: " + str(self.game_map.target_x) + ", y: " + str(self.game_map.target_y))
         self.observation = self.game_map.plane
-        self.observation[self.player.x][self.player.y][0] = -100
+        # self.observation[self.player.x][self.player.y][0] = -100
 
 
 class TestCls(Environment):
@@ -68,81 +69,76 @@ class TestCls(Environment):
         self.env = FacEnv()
         self.movement_reward = None
         self.state_space = StateSpace({
-            "observation": PlanarMapsObservationSpace(shape=np.array([self.env.map_size, self.env.map_size, 1]), low=-100,
-                                                      high=200)
+            "observation": PlanarMapsObservationSpace(shape=np.array([self.env.map_size, self.env.map_size, 2]), low=0,
+                                                      high=1)
         })
         self.action_space = DiscreteActionSpace(num_actions=9,
                                                 descriptions={"0": "up", "1": "down", "2": "left", "3": "right"})
         self.movements = Movements(self.action_space)
 
     def _take_action(self, action_idx: ActionType) -> None:
-        self.env.observation[self.env.player.x][self.env.player.y][0] = 0
+        self.env.observation[self.env.game_map.target_x][self.env.game_map.target_y][0] = 0
         self.movements.actions_counter[action_idx] += 1
         if action_idx == 0:
-            self.env.player.y += 1
+            self.env.game_map.target_y += 1
         elif action_idx == 1:
-            self.env.player.y -= 1
+            self.env.game_map.target_y -= 1
         elif action_idx == 2:
-            self.env.player.x -= 1
+            self.env.game_map.target_x -= 1
         elif action_idx == 3:
-            self.env.player.x += 1
+            self.env.game_map.target_x += 1
         elif action_idx == 4:
-            self.env.player.y += 1
-            self.env.player.x += 1
+            self.env.game_map.target_y += 1
+            self.env.game_map.target_x += 1
         elif action_idx == 5:
-            self.env.player.y -= 1
-            self.env.player.x += 1
+            self.env.game_map.target_y -= 1
+            self.env.game_map.target_x += 1
         elif action_idx == 6:
-            self.env.player.y += 1
-            self.env.player.x -= 1
+            self.env.game_map.target_y += 1
+            self.env.game_map.target_x -= 1
         elif action_idx == 7:
-            self.env.player.y -= 1
-            self.env.player.x -= 1
+            self.env.game_map.target_y -= 1
+            self.env.game_map.target_x -= 1
 
-        if self.env.player.x == 0:
-            self.env.player.x = 1
-        if self.env.player.y == 0:
-            self.env.player.y = 1
-        if self.env.player.x == self.env.map_size - 1:
-            self.env.player.x = self.env.map_size - 2
-        if self.env.player.y == self.env.map_size - 1:
-            self.env.player.y = self.env.map_size - 2
+        if self.env.game_map.target_x == 0:
+            self.env.game_map.target_x = 1
+        if self.env.game_map.target_y == 0:
+            self.env.game_map.target_y = 1
+        if self.env.game_map.target_x == self.env.map_size - 1:
+            self.env.game_map.target_x = self.env.map_size - 2
+        if self.env.game_map.target_y == self.env.map_size - 1:
+            self.env.game_map.target_y = self.env.map_size - 2
 
-        self.env.observation[self.env.player.x][self.env.player.y][0] = -100
-        self.env.observation[self.env.game_map.target_x][self.env.game_map.target_y][0] = 100
+        self.env.observation[self.env.game_map.target_x][self.env.game_map.target_y][0] = 1
         if action_idx == 8:
-            if self.env.game_map.target_x == self.env.player.x and self.env.game_map.target_y == self.env.player.y:
-                self.env.observation[self.env.player.x][self.env.player.y][0] = 200
+            if self.env.game_map.target_x == int(self.env.map_size/2) and self.env.game_map.target_y == int(self.env.map_size/2):
+                self.env.game_map.plane[int(self.env.map_size/2)][int(self.env.map_size/2)][1] = 1
 
     def _update_state(self) -> None:
-        if self.env.observation[self.env.player.x][self.env.player.y][0] == 200:
+        if self.env.game_map.plane[int(self.env.map_size/2)][int(self.env.map_size/2)][1] == 1:
+            print(
+                "TARGET after " + str(
+                    self.movements.wrongs / self.current_episode_steps_counter * 100) + "% wrong steps")
             self.finish_reward = 10000
         else:
             self.finish_reward = 0
-        self.movement_reward = -(np.abs(self.env.player.x - self.env.game_map.target_x) +
-                                 np.abs(self.env.player.y - self.env.game_map.target_y))
-        self.done = (#(self.env.target['x'] == int(self.env.map_size/2) and
-                     #self.env.target['y'] == int(self.env.map_size/2)) or
-                     self.env.observation[self.env.game_map.target_x][self.env.game_map.target_y][0] == 200 or
-                     self.current_episode_steps_counter > 200) #or
-                     #self.env.target['x'] <= 0 or
-                     #self.env.target['y'] <= 0 or
-                     #self.env.target['x'] >= self.env.map_size-1 or
-                     #self.env.target['y'] >= self.env.map_size-1)
+        if self.env.game_map.plane[int(self.env.map_size/2)][int(self.env.map_size/2)][0] == 1:
+            print("MIDDLE")
+        self.movement_reward = -(np.abs(int(self.env.map_size/2) - self.env.game_map.target_x) +
+                                 np.abs(int(self.env.map_size/2) - self.env.game_map.target_y))
+        self.done = (self.env.game_map.plane[int(self.env.map_size/2)][int(self.env.map_size/2)][1] == 1 or
+                     self.current_episode_steps_counter > 200)
         self.state = {"observation": self.env.observation}
         new_reward = self.out_of_map_reward + self.movement_reward + self.finish_reward
         if self.reward >= new_reward:
             self.movements.wrongs += 1
         self.reward = new_reward
         self.out_of_map_reward = self.movement_reward = self.finish_reward = 0
+        if self.current_episode_steps_counter > 200:
+            print(
+                "LOST after " + str(self.movements.wrongs / self.current_episode_steps_counter * 100) + "% wrong steps")
 
     def _restart_environment_episode(self, force_environment_reset=False) -> None:
-        if self.current_episode_steps_counter != 0:
-            if self.env.observation[self.env.game_map.target_x][self.env.game_map.target_y][0] == 200:
-                print(
-                    "TARGET after " + str(self.movements.wrongs / self.current_episode_steps_counter * 100) + "% wrong steps")
-            else:
-                print("LOST after " + str(self.movements.wrongs / self.current_episode_steps_counter * 100) + "% wrong steps")
         print("Wrongs: ", self.movements.wrongs)
         for index, value in enumerate(self.movements.actions_counter):
             print(str(index) + ": " + str(value))
