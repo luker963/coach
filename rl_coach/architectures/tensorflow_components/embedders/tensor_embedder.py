@@ -49,4 +49,17 @@ class TensorEmbedder(InputEmbedder):
 
     @property
     def schemes(self):
-        return {}
+        return {
+            EmbedderScheme.Empty:
+                [],
+            EmbedderScheme.Shallow:
+                [
+                    Conv2d(32, 3, 1)
+                ],
+            EmbedderScheme.Medium:
+                [
+                    Conv2d(32, 8, 4),
+                    Conv2d(64, 4, 2),
+                    Conv2d(64, 3, 1)
+                ],
+        }

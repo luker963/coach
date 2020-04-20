@@ -32,6 +32,7 @@ def get_activation_function(activation_function_string: str):
         'elu': tf.nn.elu,
         'selu': tf.nn.selu,
         'leaky_relu': tf.nn.leaky_relu,
+        'softmax': tf.nn.softmax,
         'none': None
     }
     assert activation_function_string in activation_functions.keys(), \
