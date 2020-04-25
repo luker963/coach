@@ -13,10 +13,14 @@ from rl_coach.schedules import LinearSchedule
 agent_params = DQNAgentParameters()
 agent_params.algorithm.num_steps_between_copying_online_weights_to_target = EnvironmentSteps(100)
 agent_params.exploration.evaluation_epsilon = 0
-agent_params.exploration.epsilon_schedule = LinearSchedule(1, 0, 200000)
+agent_params.exploration.epsilon_schedule = LinearSchedule(1, 0, 1000000)
 agent_params.network_wrappers['main'].middleware_parameters.scheme = [Dense(512)]
+# agent_params.network_wrappers['main'].middleware_parameters.num_streams = 3
 agent_params.network_wrappers['main'].input_embedders_parameters = {
     "observation": InputEmbedderParameters(scheme=EmbedderScheme.Empty)
+    # "targets": InputEmbedderParameters(scheme=EmbedderScheme.Empty),
+    # "miners": InputEmbedderParameters(scheme=EmbedderScheme.Empty),
+    # "chests": InputEmbedderParameters(scheme=EmbedderScheme.Empty)
 }
 # agent_params.network_wrappers['main'].replace_mse_with_huber_loss = False
 # agent_params.algorithm.num_consecutive_playing_steps = EnvironmentSteps(4)
