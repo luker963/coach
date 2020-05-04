@@ -58,7 +58,7 @@ class GameMap:
         self.belts = []
         self.height = height
         self.width = width
-        self.observation_plane = np.zeros((self.height, self.width, self.channels), dtype=float)
+        self.observation_plane = np.zeros((self.height, self.width, self.channels), dtype=int)
         for _ in range(spawns):
             while True:
                 x = np.random.randint(1, self.height - 2)
@@ -128,7 +128,7 @@ class TestCls(Environment):
 
     def fill_observations(self):
         self.env.game_map.observation_plane = np.zeros(
-            (self.env.map_size, self.env.map_size, self.env.game_map.channels), dtype=float)
+            (self.env.map_size, self.env.map_size, self.env.game_map.channels), dtype=int)
         for target in self.env.game_map.targets:
             if 0 <= target.x <= self.env.map_size - 1 and 0 <= target.y <= self.env.map_size - 1:
                 self.env.game_map.observation_plane[target.x][target.y][Channels.TARGETS] = 1
@@ -145,7 +145,7 @@ class TestCls(Environment):
             new_reward = self.movement_reward + self.finish_reward + self.chest_reward + self.miner_reward + self.build_reward - 1
         else:
             if self.env.game_map.observation_plane[int(self.env.map_size / 2)][int(self.env.map_size / 2)][Channels.TARGETS] == 1:
-                self.build_reward = 100
+                self.build_reward = -1
             elif action_idx == 8:
                 self.get_belt_reward()
             else:
