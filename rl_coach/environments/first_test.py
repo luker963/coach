@@ -1,3 +1,4 @@
+import copy
 from enum import IntEnum
 
 from rl_coach.base_parameters import VisualizationParameters
@@ -13,12 +14,7 @@ from typing import Union
 
 class Channels(IntEnum):
     TARGETS = 0
-    MINER_ORIENTED_UP = 1
-    MINER_ORIENTED_DOWN = 2
-    MINER_ORIENTED_LEFT = 3
-    MINER_ORIENTED_RIGHT = 4
-    # MINERS = 1
-    CHESTS = 5
+    BELTS = 1
 
 
 class Miner:
@@ -55,19 +51,25 @@ class GameMap:
     channels = len(Channels)
     observation_plane = []
     targets = []
-    chests = []
-    miners = []
+    belts = []
 
     def __init__(self, height: int, width: int, spawns: int):
         self.targets = []
-        self.chests = []
-        self.miners = []
+        self.belts = []
         self.height = height
         self.width = width
         self.observation_plane = np.zeros((self.height, self.width, self.channels), dtype=float)
         for _ in range(spawns):
-            x = np.random.randint(1, self.height - 2)
-            y = np.random.randint(1, self.height - 2)
+            while True:
+                x = np.random.randint(1, self.height - 2)
+                y = np.random.randint(1, self.height - 2)
+                target = None
+                for target in self.targets:
+                    if target.x == x and target.y == y:
+                        continue
+                if target and target.x == x and target.y == y:
+                    continue
+                break
             print("spawn at x:" + str(x) + ", y:" + str(y))
             self.observation_plane[x][y][Channels.TARGETS] = 1
             self.targets.append(Coordinate(x, y))
@@ -87,7 +89,7 @@ class FacEnv:
     map_size = 50
 
     def __init__(self):
-        self.game_map = GameMap(self.map_size, self.map_size, 1)
+        self.game_map = GameMap(self.map_size, self.map_size, 2)
 
 
 class TestCls(Environment):
@@ -102,63 +104,24 @@ class TestCls(Environment):
         self.env = FacEnv()
         self.chest_reward = 0
         self.miner_reward = 0
+        self.build_reward = 0
         self.movement_reward = 0
         self.finish_reward = 0
+        self.target_with_belt = None
         self.old_distance = 0
         self.new_distance = 0
+        self.old_belt_target_distance = 0
+        self.new_belt_target_distance = 0
         self.state_space = StateSpace({
-            "observation": TensorObservationSpace(shape=np.array([self.env.map_size, self.env.map_size, 6]), low=0,
+            "observation": TensorObservationSpace(shape=np.array([self.env.map_size, self.env.map_size, 2]), low=0,
                                                   high=1)
         })
-        self.action_space = DiscreteActionSpace(num_actions=13,
+        self.action_space = DiscreteActionSpace(num_actions=9,
                                                 descriptions={})
         self.movements = Movements(self.action_space)
 
-    def is_miner_next_to_me(self):
-        if self.env.game_map.observation_plane[int(self.env.map_size / 2)][int(self.env.map_size / 2) - 1][
-            Channels.MINER_ORIENTED_UP] == 1:
-            return True
-        if self.env.game_map.observation_plane[int(self.env.map_size / 2)][int(self.env.map_size / 2) + 1][
-            Channels.MINER_ORIENTED_DOWN] == 1:
-            return True
-        if self.env.game_map.observation_plane[int(self.env.map_size / 2) - 1][int(self.env.map_size / 2)][
-            Channels.MINER_ORIENTED_RIGHT] == 1:
-            return True
-        if self.env.game_map.observation_plane[int(self.env.map_size / 2) + 1][int(self.env.map_size / 2)][
-            Channels.MINER_ORIENTED_LEFT] == 1:
-            return True
-        return False
-
-    def is_chest_next_to_me(self, orientation):
-        if orientation == Channels.MINER_ORIENTED_UP and \
-                self.env.game_map.observation_plane[int(self.env.map_size / 2)][int(self.env.map_size / 2) + 1][
-                    Channels.CHESTS] == 1:
-            return True
-        if orientation == Channels.MINER_ORIENTED_DOWN and \
-                self.env.game_map.observation_plane[int(self.env.map_size / 2)][int(self.env.map_size / 2) - 1][
-                    Channels.CHESTS] == 1:
-            return True
-        if orientation == Channels.MINER_ORIENTED_RIGHT and \
-                self.env.game_map.observation_plane[int(self.env.map_size / 2) + 1][int(self.env.map_size / 2)][
-                    Channels.CHESTS] == 1:
-            return True
-        if orientation == Channels.MINER_ORIENTED_LEFT and \
-                self.env.game_map.observation_plane[int(self.env.map_size / 2) - 1][int(self.env.map_size / 2)][
-                    Channels.CHESTS] == 1:
-            return True
-        return False
-
     def is_place_buildable(self):
-        if (self.env.game_map.observation_plane[int(self.env.map_size / 2)][int(self.env.map_size / 2)][
-                Channels.CHESTS] == 0) and (
-                self.env.game_map.observation_plane[int(self.env.map_size / 2)][int(self.env.map_size / 2)][
-                    Channels.MINER_ORIENTED_UP] == 0) and (
-                self.env.game_map.observation_plane[int(self.env.map_size / 2)][int(self.env.map_size / 2)][
-                    Channels.MINER_ORIENTED_DOWN] == 0) and (
-                self.env.game_map.observation_plane[int(self.env.map_size / 2)][int(self.env.map_size / 2)][
-                    Channels.MINER_ORIENTED_LEFT] == 0) and (
-                self.env.game_map.observation_plane[int(self.env.map_size / 2)][int(self.env.map_size / 2)][
-                    Channels.MINER_ORIENTED_RIGHT] == 0):
+        if self.env.game_map.observation_plane[int(self.env.map_size / 2)][int(self.env.map_size / 2)][Channels.BELTS] == 0:
             return True
         else:
             return False
@@ -169,66 +132,115 @@ class TestCls(Environment):
         for target in self.env.game_map.targets:
             if 0 <= target.x <= self.env.map_size - 1 and 0 <= target.y <= self.env.map_size - 1:
                 self.env.game_map.observation_plane[target.x][target.y][Channels.TARGETS] = 1
-        for miner in self.env.game_map.miners:
-            if 0 <= miner.x <= self.env.map_size - 1 and 0 <= miner.y <= self.env.map_size - 1:
-                self.env.game_map.observation_plane[miner.x][miner.y][miner.orientation] = 1
-        for chest in self.env.game_map.chests:
-            if 0 <= chest.x <= self.env.map_size - 1 and 0 <= chest.y <= self.env.map_size - 1:
-                self.env.game_map.observation_plane[chest.x][chest.y][Channels.CHESTS] = 1
+        for belts in self.env.game_map.belts:
+            if 0 <= belts.x <= self.env.map_size - 1 and 0 <= belts.y <= self.env.map_size - 1:
+                self.env.game_map.observation_plane[belts.x][belts.y][Channels.BELTS] = 1
 
-    def build_oriented_miner(self, orientation):
-        if self.env.game_map.observation_plane[int(self.env.map_size / 2)][int(self.env.map_size / 2)][
-            Channels.TARGETS] == 1:
-            if self.is_place_buildable():
-                new_miner = Miner(int(self.env.map_size / 2), int(self.env.map_size / 2), orientation)
-                self.env.game_map.miners.append(new_miner)
-                print("miner")
-                if self.is_chest_next_to_me(orientation):
-                    self.done = True
-                    self.finish_reward = 100
-                else:
-                    self.miner_reward = 100
+    def compute_reward(self, action_idx):
+        if not self.target_with_belt:
+            if self.old_distance >= self.new_distance:
+                self.movement_reward = self.old_distance - self.new_distance
             else:
-                self.miner_reward = -1
+                self.movement_reward = -1
+            new_reward = self.movement_reward + self.finish_reward + self.chest_reward + self.miner_reward + self.build_reward - 1
         else:
-            self.miner_reward = -1
+            if self.env.game_map.observation_plane[int(self.env.map_size / 2)][int(self.env.map_size / 2)][Channels.TARGETS] == 1:
+                self.build_reward = 100
+            elif action_idx == 8:
+                self.get_belt_reward()
+            else:
+                self.movement_reward = -1
+            new_reward = self.movement_reward + self.finish_reward + self.chest_reward + self.miner_reward + self.build_reward - 1
+
+        if self.reward >= new_reward:
+            self.movements.wrongs += 1
+        self.reward = new_reward
+        self.movement_reward = self.finish_reward = self.chest_reward = self.miner_reward = self.build_reward = 0
+
+    def get_belt_reward(self):
+        desired_target = [target for target in self.env.game_map.targets if target.x != self.target_with_belt.x or target.y != self.target_with_belt.y][0]
+        belts_copy = copy.deepcopy(self.env.game_map.belts)
+        start_belt = [belt for belt in belts_copy if belt.x == self.target_with_belt.x and belt.y == self.target_with_belt.y][0]
+        belts_copy.remove(start_belt)
+        remaining_belts = []
+        visited_belts = [start_belt]
+        self.new_belt_target_distance = self.dist(desired_target, start_belt)
+        while True:
+            for belt in belts_copy:
+                if (belt.x == start_belt.x and belt.y + 1 == start_belt.y) or (belt.x == start_belt.x and belt.y - 1 == start_belt.y) or (belt.x + 1 == start_belt.x and belt.y == start_belt.y) or (belt.x - 1 == start_belt.x and belt.y == start_belt.y):
+                    if belt not in visited_belts:
+                        if belt not in remaining_belts:
+                            remaining_belts.append(belt)
+            if len(remaining_belts) == 0:
+                self.done = False
+                if self.old_belt_target_distance == 0:
+                    self.old_belt_target_distance = self.new_belt_target_distance
+                elif self.old_belt_target_distance > self.new_belt_target_distance:
+                    self.build_reward = 100
+                else:
+                    self.build_reward = -1
+                return
+            start_belt = remaining_belts.pop(0)
+            self.new_belt_target_distance = min(self.dist(desired_target, start_belt), self.new_belt_target_distance)
+            belts_copy.remove(start_belt)
+            if start_belt.x == desired_target.x and start_belt.y == desired_target.y:
+                self.done = True
+                self.build_reward = 100
+                return
+
+    def next_belt(self, belt, obs_copy):
+        num_of_next_belts = 0
+        target = [target for target in self.env.game_map.targets if
+                  target.x != self.target_with_belt.x or target.y != self.target_with_belt.y][0]
+        if belt.x == target.x and belt.y == target.y:
+            return True
+        if obs_copy[belt.x][belt.y + 1][Channels.BELTS] == 1:
+            num_of_next_belts += 1
+        if obs_copy[belt.x][belt.y - 1][Channels.BELTS] == 1:
+            num_of_next_belts += 1
+        if obs_copy[belt.x + 1][belt.y][Channels.BELTS] == 1:
+            num_of_next_belts += 1
+        if obs_copy[belt.x - 1][belt.y][Channels.BELTS] == 1:
+            num_of_next_belts += 1
+        obs_copy[belt.x][belt.y][Channels.BELTS] = 0
+        if obs_copy[belt.x][belt.y + 1][Channels.BELTS] == 1:
+            self.next_belt(Coordinate(belt.x, belt.y + 1), obs_copy)
+        if obs_copy[belt.x][belt.y - 1][Channels.BELTS] == 1:
+            self.next_belt(Coordinate(belt.x, belt.y - 1), obs_copy)
+        if obs_copy[belt.x + 1][belt.y][Channels.BELTS] == 1:
+            self.next_belt(Coordinate(belt.x + 1, belt.y), obs_copy)
+        if obs_copy[belt.x - 1][belt.y][Channels.BELTS] == 1:
+            self.next_belt(Coordinate(belt.x - 1, belt.y), obs_copy)
+        return False
 
     def _take_action(self, action_idx: ActionType) -> None:
         self.chest_reward = 0
         self.miner_reward = 0
+        self.build_reward = 0
         self.movement_reward = 0
         self.finish_reward = 0
-        dist = lambda a, b: (a.x - b.x) ** 2 + (a.y - b.y) ** 2
-        closest_target = min(self.env.game_map.targets, key=lambda co: dist(co, Coordinate(int(self.env.map_size / 2),
-                                                                                           int(self.env.map_size / 2))))
+        self.dist = lambda a, b: np.abs(a.x - b.x) + np.abs(a.y - b.y)
+        closest_target = min(self.env.game_map.targets,
+                             key=lambda co: self.dist(co, Coordinate(int(self.env.map_size / 2),
+                                                                     int(self.env.map_size / 2))))
         self.old_distance = np.abs(int(self.env.map_size / 2) - closest_target.x) + np.abs(
             int(self.env.map_size / 2) - closest_target.y)
         self.movements.actions_counter[action_idx] += 1
-        if action_idx == 12:
-            # self.chest_reward = -1
+        if action_idx == 8:
             if self.is_place_buildable():
-                new_chest = Coordinate(int(self.env.map_size / 2), int(self.env.map_size / 2))
-                self.env.game_map.chests.append(new_chest)
-                self.env.game_map.observation_plane[int(self.env.map_size / 2)][int(self.env.map_size / 2)][
-                    Channels.CHESTS] = 1
-                if self.is_miner_next_to_me():
-                    self.done = True
-                    self.finish_reward = 100
+                new_belt = Coordinate(int(self.env.map_size / 2), int(self.env.map_size / 2))
+                self.env.game_map.belts.append(new_belt)
+                if self.env.game_map.observation_plane[int(self.env.map_size / 2)][int(self.env.map_size / 2)][Channels.TARGETS] == 1:
+                    self.build_reward = 100
+                    print("belt on target")
+                    self.target_with_belt = [target for target in self.env.game_map.targets if
+                                             target.x == target.y == int(self.env.map_size / 2)][0]
                 else:
-                    self.chest_reward = -1
+                    self.build_reward = -1
             else:
-                self.chest_reward = -1
-
-        elif action_idx == 11:
-            self.build_oriented_miner(Channels.MINER_ORIENTED_RIGHT)
-        elif action_idx == 10:
-            self.build_oriented_miner(Channels.MINER_ORIENTED_LEFT)
-        elif action_idx == 9:
-            self.build_oriented_miner(Channels.MINER_ORIENTED_DOWN)
-        elif action_idx == 8:
-            self.build_oriented_miner(Channels.MINER_ORIENTED_UP)
+                self.build_reward = -1
         else:
-            for entity in self.env.game_map.targets + self.env.game_map.miners + self.env.game_map.chests:
+            for entity in self.env.game_map.targets + self.env.game_map.belts:
                 if action_idx == 0:
                     entity.y += 1
                 elif action_idx == 1:
@@ -250,29 +262,24 @@ class TestCls(Environment):
                     entity.x -= 1
                     entity.y -= 1
         self.fill_observations()
-        closest_target = min(self.env.game_map.targets, key=lambda co: dist(co,
-                                                                            Coordinate(int(self.env.map_size / 2),
-                                                                                       int(self.env.map_size / 2))))
+        closest_target = min(self.env.game_map.targets, key=lambda co: self.dist(co,
+                                                                                 Coordinate(int(self.env.map_size / 2),
+                                                                                            int(
+                                                                                                self.env.map_size / 2))))
         self.new_distance = np.abs(
             int(self.env.map_size / 2) - closest_target.x) + np.abs(int(self.env.map_size / 2) - closest_target.y)
+        self.compute_reward(action_idx)
 
     def _update_state(self) -> None:
+            # self.done = self.next_belt(self.env.game_map.belts[0], copy.deepcopy(self.env.game_map.observation_plane))
         if self.done:
             print("TARGET")
-        if self.old_distance != self.new_distance:
-            self.movement_reward = self.old_distance - self.new_distance
-        else:
-            self.movement_reward = -1
         self.done = (self.done or
-                     self.current_episode_steps_counter > 100)
+                     self.current_episode_steps_counter > 200)
         self.state = {"observation": self.env.game_map.observation_plane}
-        new_reward = self.movement_reward + self.finish_reward + self.chest_reward + self.miner_reward - 1
-        if self.reward >= new_reward:
-            self.movements.wrongs += 1
-        self.reward = new_reward
-        self.movement_reward = self.finish_reward = self.chest_reward = self.miner_reward = 0
 
     def _restart_environment_episode(self, force_environment_reset=False) -> None:
+        self.target_with_belt = None
         print("Wrongs: ", self.movements.wrongs)
         for index, value in enumerate(self.movements.actions_counter):
             print(str(index) + ": " + str(value))
