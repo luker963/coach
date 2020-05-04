@@ -144,9 +144,7 @@ class TestCls(Environment):
                 self.movement_reward = -1
             new_reward = self.movement_reward + self.finish_reward + self.chest_reward + self.miner_reward + self.build_reward - 1
         else:
-            if self.env.game_map.observation_plane[int(self.env.map_size / 2)][int(self.env.map_size / 2)][Channels.TARGETS] == 1:
-                self.build_reward = -1
-            elif action_idx == 8:
+            if action_idx == 8:
                 self.get_belt_reward()
             else:
                 self.movement_reward = -1
@@ -177,6 +175,7 @@ class TestCls(Environment):
                     self.old_belt_target_distance = self.new_belt_target_distance
                 elif self.old_belt_target_distance > self.new_belt_target_distance:
                     self.build_reward = 100
+                    self.old_belt_target_distance = self.new_belt_target_distance
                 else:
                     self.build_reward = -1
                 return
@@ -214,6 +213,8 @@ class TestCls(Environment):
         return False
 
     def _take_action(self, action_idx: ActionType) -> None:
+        if self.total_reward_in_current_episode > 10000:
+            print("")
         self.chest_reward = 0
         self.miner_reward = 0
         self.build_reward = 0
